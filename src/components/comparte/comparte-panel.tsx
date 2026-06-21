@@ -5,6 +5,7 @@ import { Boton } from "@/components/ui/boton";
 import { Campo } from "@/components/ui/campo";
 import toast from "react-hot-toast";
 import { Copy, ExternalLink, QrCode } from "lucide-react";
+import QRCode from "qrcode";
 import type { SesionUsuario } from "@/lib/auth";
 
 interface Vendedor { id: string; nombre: string; paginaAgendaSlug: string | null; }
@@ -43,8 +44,9 @@ export function CompartePanel({ vendedores, config, sesion }: {
     toast.success("¡Link copiado!");
   }
 
-  function generarQR(url: string) {
-    setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`);
+  async function generarQR(url: string) {
+    const dataUrl = await QRCode.toDataURL(url, { width: 300, margin: 2 });
+    setQrUrl(dataUrl);
   }
 
   return (
