@@ -1,0 +1,372 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─── USUARIOS ────────────────────────────────────────────────────────────────
+
+model Usuario {
+  id                   String    @id @default(cuid())
+  nombre               String
+  correo               String    @unique
+  contrasenaHash       String
+  rol                  String    @default("VENDEDOR") // ADMIN | VENDEDOR | LECTURA
+  activo               Boolean   @default(true)
+  avatarUrl            String?
+  temaPreferido        String    @default("sistema")
+  vistaCompacta        Boolean   @default(false)
+  onboardingCompletado Boolean   @default(false)
+  metaMensual          Float?
+  comision             Float?
+  paginaAgendaActiva   Boolean   @default(true)
+  paginaAgendaSlug     String?   @unique
+  intentosFallidos     Int       @default(0)
+  bloqueadoHasta       DateTime?
+  creadoEn             DateTime  @default(now())
+  actualizadoEn        DateTime  @updatedAt
+
+  clientes           Cliente[]          @relation("VendedorClientes")
+  citas              Cita[]             @relation("VendedorCitas")
+  recordatorios      Recordatorio[]
+  auditoria          RegistroAuditoria[]
+  historialAcciones  HistorialAccion[]
+  archivosSubidos    Archivo[]
+  favoritos          Favorito[]
+  vistasGuardadas    VistaGuardada[]
+  sesiones           SesionToken[]
+
+  @@index([correo])
+}
+
+model SesionToken {
+  id        String   @id @default(cuid())
+  usuarioId String
+  token     String   @unique
+  expiraEn  DateTime
+  creadoEn  DateTime @default(now())
+
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+}
+
+// ─── CLIENTES ────────────────────────────────────────────────────────────────
+
+model Cliente {
+  id                    String    @id @default(cuid())
+  nombre                String
+  telefono              String?
+  telefonoInternacional String?
+  correo                String?
+  origen                String?
+  canalUtm              String?
+  etapa                 String    @default("Nuevo")
+  estado                String    @default("ACTIVO")
+  temperatura           String    @default("Tibio")
+  objecionPrincipal     String?
+  valorEstimado         Float?
+  notas                 String?
+  proximaAccion         String?
+  proximaAccionFecha    DateTime?
+  vendedorId            String?
+  cumpleanos            DateTime?
+  fechaRenovacion       DateTime?
+  proximaRevision       DateTime?
+  presupuesto           Float?
+  productosInteres      String?
+  ultimaCompra          DateTime?
+  productosContratados  String?
+  referidos             String?
+  tipoPóliza            String?
+  motivoPerdida         String?
+  ultimoContactoEn      DateTime?
+  eliminadoEn           DateTime?
+  estadoAnterior        String?
+  etapaAnterior         String?
+  empresaNombre         String?
+  empresaGiro           String?
+  empresaPuesto         String?
+  empresaRfc            String?
+  empresaWeb            String?
+  empresaDireccion      String?
+  empresaTamano         String?
+  empresaNotas          String?
+  creadoEn              DateTime  @default(now())
+  actualizadoEn         DateTime  @updatedAt
+  ultimaModificacionEn  DateTime  @default(now())
+
+  vendedor         Usuario?          @relation("VendedorClientes", fields: [vendedorId], references: [id])
+  citas            Cita[]
+  pagos            Pago[]
+  historial        HistorialAccion[]
+  archivos         Archivo[]
+  etiquetasCliente EtiquetaCliente[]
+  recordatorios    Recordatorio[]
+  favoritos        Favorito[]
+
+  @@index([nombre])
+  @@index([telefono])
+  @@index([correo])
+  @@index([etapa])
+  @@index([estado])
+  @@index([vendedorId])
+  @@index([eliminadoEn])
+  @@index([empresaNombre])
+}
+
+// ─── CITAS ───────────────────────────────────────────────────────────────────
+
+model Cita {
+  id                String    @id @default(cuid())
+  clienteId         String
+  vendedorId        String?
+  fecha             DateTime
+  duracionMinutos   Int       @default(45)
+  tipo              String    @default("Virtual")
+  estado            String    @default("pendiente")
+  notas             String?
+  googleEventId     String?
+  googleMeetUrl     String?
+  eliminadoEn       DateTime?
+  nombreProspecto   String?
+  telefonoProspecto String?
+  correoProspecto   String?
+  origenAgenda      String?
+  creadoEn          DateTime  @default(now())
+  actualizadoEn     DateTime  @updatedAt
+
+  cliente  Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  vendedor Usuario? @relation("VendedorCitas", fields: [vendedorId], references: [id])
+
+  @@index([clienteId])
+  @@index([vendedorId])
+  @@index([fecha])
+  @@index([estado])
+  @@index([eliminadoEn])
+}
+
+// ─── PAGOS ───────────────────────────────────────────────────────────────────
+
+model Pago {
+  id               String    @id @default(cuid())
+  clienteId        String
+  monto            Float
+  montoTotal       Float?
+  metodo           String
+  estatus          String    @default("pendiente")
+  fechaPago        DateTime?
+  fechaVencimiento DateTime?
+  concepto         String?
+  folio            Int?
+  notas            String?
+  eliminadoEn      DateTime?
+  creadoEn         DateTime  @default(now())
+  actualizadoEn    DateTime  @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@index([estatus])
+  @@index([fechaVencimiento])
+  @@index([eliminadoEn])
+}
+
+// ─── HISTORIAL ───────────────────────────────────────────────────────────────
+
+model HistorialAccion {
+  id          String   @id @default(cuid())
+  clienteId   String
+  usuarioId   String?
+  tipo        String
+  descripcion String
+  fecha       DateTime @default(now())
+  metadatos   String?
+
+  cliente Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([clienteId])
+  @@index([fecha])
+}
+
+// ─── RECORDATORIOS ───────────────────────────────────────────────────────────
+
+model Recordatorio {
+  id         String    @id @default(cuid())
+  usuarioId  String
+  clienteId  String?
+  texto      String
+  fecha      DateTime
+  completado Boolean   @default(false)
+  pospuesto  Boolean   @default(false)
+  creadoEn   DateTime  @default(now())
+
+  usuario Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  cliente Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
+  @@index([usuarioId])
+  @@index([fecha])
+}
+
+// ─── ARCHIVOS ─────────────────────────────────────────────────────────────────
+
+model Archivo {
+  id          String   @id @default(cuid())
+  clienteId   String
+  subidoPorId String?
+  nombre      String
+  etiqueta    String   @default("Otro")
+  tipo        String
+  tamanio     Int
+  datos       Bytes?
+  urlExterna  String?
+  creadoEn    DateTime @default(now())
+
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  subidoPor Usuario? @relation(fields: [subidoPorId], references: [id])
+
+  @@index([clienteId])
+}
+
+// ─── ETIQUETAS ───────────────────────────────────────────────────────────────
+
+model Etiqueta {
+  id       String   @id @default(cuid())
+  nombre   String   @unique
+  color    String   @default("#7b86e0")
+  creadoEn DateTime @default(now())
+
+  clientes EtiquetaCliente[]
+}
+
+model EtiquetaCliente {
+  clienteId  String
+  etiquetaId String
+  asignadoEn DateTime @default(now())
+
+  cliente  Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  etiqueta Etiqueta @relation(fields: [etiquetaId], references: [id], onDelete: Cascade)
+
+  @@id([clienteId, etiquetaId])
+}
+
+// ─── PLANTILLAS ──────────────────────────────────────────────────────────────
+
+model PlantillaMensaje {
+  id            String   @id @default(cuid())
+  nombre        String
+  tipo          String   // WhatsApp | Correo
+  etapa         String?
+  objecion      String?
+  asunto        String?
+  cuerpo        String
+  esFavorita    Boolean  @default(false)
+  esSistema     Boolean  @default(false)
+  usuarioId     String?
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+}
+
+// ─── CONFIG DEL NEGOCIO ──────────────────────────────────────────────────────
+
+model ConfigNegocio {
+  id                   String   @id @default("principal")
+  nombre               String   @default("LEF PATRIMONIAL")
+  logoUrl              String?
+  colorMarca           String   @default("#7b86e0")
+  moneda               String   @default("MXN")
+  simboloMoneda        String   @default("$")
+  husoHorario          String   @default("America/Mexico_City")
+  horarioInicio        Int      @default(10)
+  horarioFin           Int      @default(18)
+  duracionCitaMinutos  Int      @default(45)
+  metaMensualDinero    Float?   @default(100000)
+  metaMensualClientes  Int?     @default(10)
+  mensajeWhatsApp      String   @default("Hola {nombre}, gracias por tu interés. ¿Te late si agendamos una llamada para platicarte cómo te puedo ayudar?")
+  umbralEstancamiento  Int      @default(7)
+  comisionGlobal       Float?
+  actualizadoEn        DateTime @updatedAt
+}
+
+// ─── MOTIVOS DE PÉRDIDA ──────────────────────────────────────────────────────
+
+model MotivoPerdida {
+  id       String  @id @default(cuid())
+  nombre   String  @unique
+  activo   Boolean @default(true)
+  orden    Int     @default(0)
+}
+
+// ─── FAVORITOS ───────────────────────────────────────────────────────────────
+
+model Favorito {
+  usuarioId String
+  clienteId String
+  creadoEn  DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, clienteId])
+}
+
+// ─── VISTAS GUARDADAS ────────────────────────────────────────────────────────
+
+model VistaGuardada {
+  id        String   @id @default(cuid())
+  usuarioId String
+  nombre    String
+  filtros   String
+  seccion   String
+  creadoEn  DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+}
+
+// ─── BITÁCORA ─────────────────────────────────────────────────────────────────
+
+model RegistroAuditoria {
+  id          String   @id @default(cuid())
+  usuarioId   String?
+  accion      String
+  recursoTipo String
+  recursoId   String?
+  descripcion String
+  ipOrigen    String?
+  creadoEn    DateTime @default(now())
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+  @@index([creadoEn])
+  @@index([recursoTipo])
+}
+
+// ─── LEADS DE LANDING ─────────────────────────────────────────────────────────
+
+model LeadLanding {
+  id               String   @id @default(cuid())
+  nombre           String
+  telefono         String
+  correo           String?
+  origen           String?
+  canalUtm         String?
+  vendedorSlug     String?
+  procesado        Boolean  @default(false)
+  clienteId        String?
+  intentosFallidos Int      @default(0)
+  creadoEn         DateTime @default(now())
+
+  @@index([procesado])
+}
+
+// ─── CONTADOR DE FOLIO ────────────────────────────────────────────────────────
+
+model ContadorFolio {
+  id     String @id @default("pagos")
+  ultimo Int    @default(0)
+}

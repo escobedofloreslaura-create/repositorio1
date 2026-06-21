@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+/* ─── TOKENS DE DISEÑO — LEF PATRIMONIAL ─────────────────────────────────── */
+:root {
+  /* Color de marca: Índigo */
+  --marca: #7b86e0;
+  --marca-oscuro: #6470d4;
+  --marca-suave: #e8eafb;
+
+  /* Superficies — modo claro */
+  --fondo: #f8f9fc;
+  --fondo-alt: #f0f2f9;
+  --surface: #ffffff;
+  --surface-hover: #f4f6ff;
+  --surface-glass: rgba(255,255,255,0.7);
+  --borde: #e5e8f5;
+  --borde-fuerte: #c8cde8;
+
+  /* Texto */
+  --texto: #1a1d2e;
+  --texto-suave: #6b7280;
+  --texto-muy-suave: #9ca3af;
+
+  /* Semáforos */
+  --exito: #10b981;
+  --advertencia: #f59e0b;
+  --peligro: #ef4444;
+  --info: #3b82f6;
+
+  /* Sombras */
+  --sombra-sm: 0 1px 3px rgba(123,134,224,0.08);
+  --sombra: 0 4px 16px rgba(123,134,224,0.12);
+  --sombra-lg: 0 8px 32px rgba(123,134,224,0.16);
+  --sombra-glass: 0 8px 32px rgba(123,134,224,0.08), inset 0 0 0 1px rgba(255,255,255,0.6);
+}
+
+/* ─── MODO OSCURO ─────────────────────────────────────────────────────────── */
+[data-tema="oscuro"], .dark {
+  --fondo: #0f1117;
+  --fondo-alt: #161822;
+  --surface: #1c1f2e;
+  --surface-hover: #252840;
+  --surface-glass: rgba(28,31,46,0.8);
+  --borde: #2d3154;
+  --borde-fuerte: #3d4270;
+  --texto: #e8eaf6;
+  --texto-suave: #9ca3c0;
+  --texto-muy-suave: #6b7a9e;
+  --sombra-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --sombra: 0 4px 16px rgba(0,0,0,0.4);
+  --sombra-lg: 0 8px 32px rgba(0,0,0,0.5);
+  --sombra-glass: 0 8px 32px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.06);
+  --marca-suave: #1e2240;
+}
+
+/* ─── TEMA EN VARIABLES CSS → Tailwind ───────────────────────────────────── */
+@theme inline {
+  --color-marca: var(--marca);
+  --color-marca-oscuro: var(--marca-oscuro);
+  --color-marca-suave: var(--marca-suave);
+  --color-fondo: var(--fondo);
+  --color-fondo-alt: var(--fondo-alt);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-glass: var(--surface-glass);
+  --color-borde: var(--borde);
+  --color-borde-fuerte: var(--borde-fuerte);
+  --color-texto: var(--texto);
+  --color-texto-suave: var(--texto-suave);
+  --color-texto-muy-suave: var(--texto-muy-suave);
+  --color-exito: var(--exito);
+  --color-advertencia: var(--advertencia);
+  --color-peligro: var(--peligro);
+  --color-info: var(--info);
+  --font-sans: var(--font-geist-sans);
+}
+
+/* ─── ESTILOS GLOBALES ────────────────────────────────────────────────────── */
+* {
+  border-color: var(--borde);
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--fondo);
+  color: var(--texto);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+/* ─── SCROLLBAR ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--borde-fuerte); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--texto-muy-suave); }
+
+/* ─── FOCUS ──────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--marca);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ─── GLASS ──────────────────────────────────────────────────────────────── */
+.glass {
+  background: var(--surface-glass);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  border: 1px solid var(--borde);
+  box-shadow: var(--sombra-glass);
+}
+
+/* ─── ANIMACIONES ─────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── SKELETON ────────────────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-hover) 25%, var(--borde) 50%, var(--surface-hover) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ─── DRAG ────────────────────────────────────────────────────────────────── */
+.dragging { opacity: 0.5; transform: rotate(2deg); }
+.drop-target { border-color: var(--marca) !important; background: var(--marca-suave) !important; }
+
+/* ─── PRINT ───────────────────────────────────────────────────────────────── */
+@media print {
+  .no-print { display: none !important; }
+  body { background: white !important; color: black !important; }
+}
