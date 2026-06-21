@@ -9,12 +9,13 @@ export async function GET(req: NextRequest) {
     if (!sesion) return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
-    const skip = parseInt(searchParams.get("skip") ?? "0");
+    const pagina = parseInt(searchParams.get("pagina") ?? "1");
     const take = parseInt(searchParams.get("take") ?? "50");
+    const skip = (pagina - 1) * take;
     const estado = searchParams.get("estado");
     const etapa = searchParams.get("etapa");
     const temperatura = searchParams.get("temperatura");
-    const busqueda = searchParams.get("busqueda");
+    const busqueda = searchParams.get("busqueda") ?? searchParams.get("q");
     const etiquetaId = searchParams.get("etiquetaId");
     const proximaAccionVencida = searchParams.get("proximaAccionVencida");
     const vendedorIdParam = searchParams.get("vendedorId");
@@ -33,10 +34,10 @@ export async function GET(req: NextRequest) {
 
     if (busqueda) {
       where.OR = [
-        { nombre: { contains: busqueda, mode: "insensitive" } },
+        { nombre: { contains: busqueda } },
         { telefono: { contains: busqueda } },
-        { correo: { contains: busqueda, mode: "insensitive" } },
-        { empresaNombre: { contains: busqueda, mode: "insensitive" } },
+        { correo: { contains: busqueda } },
+        { empresaNombre: { contains: busqueda } },
       ];
     }
 
@@ -64,7 +65,7 @@ export async function GET(req: NextRequest) {
       prisma.cliente.count({ where }),
     ]);
 
-    return NextResponse.json({ ok: true, data: { clientes, total } });
+    return NextResponse.json({ ok: true, data: clientes, total });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ ok: false, error: "Error al obtener clientes" }, { status: 500 });
