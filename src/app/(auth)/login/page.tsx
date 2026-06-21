@@ -31,7 +31,7 @@ export default function LoginPage() {
         setError(json.error ?? "Error al iniciar sesión");
         return;
       }
-      toast.success(`¡Bienvenido, ${json.usuario.nombre}!`);
+      toast.success(`¡Bienvenido, ${json.data.nombre}!`);
       router.push("/dashboard");
       router.refresh();
     } catch {
