@@ -44,7 +44,7 @@ const MOTIVOS_PERDIDA = ["Precio", "Se fue con la competencia", "No contestó", 
 export function ExpedienteCliente({ cliente: c, sesion }: { cliente: ClienteCompleto; sesion: { rol: string; nombre: string } }) {
   const router = useRouter();
   const [modalEstado, setModalEstado] = useState<"ganado" | "perdido" | "archivado" | null>(null);
-  const [motivoPerdida, setMotivoPerdida] = useState("");
+  const [motivoPerdida, setMotivoPerdida] = useState("Precio");
   const [cargandoEstado, setCargandoEstado] = useState(false);
   const [mostrarIA, setMostrarIA] = useState(false);
 
