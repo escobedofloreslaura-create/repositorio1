@@ -54,6 +54,14 @@ export function FormularioCliente({ sesion, inicial }: { sesion: SesionUsuario; 
         body: JSON.stringify({
           ...form,
           valorEstimado: form.valorEstimado ? Number(form.valorEstimado) : null,
+          proximaAccionFecha: form.proximaAccionFecha || null,
+          correo: form.correo || null,
+          notas: form.notas || null,
+          proximaAccion: form.proximaAccion || null,
+          objecionPrincipal: form.objecionPrincipal || null,
+          empresaNombre: form.empresaNombre || null,
+          empresaPuesto: form.empresaPuesto || null,
+          origen: form.origen || null,
         }),
       });
       const json = await res.json();
