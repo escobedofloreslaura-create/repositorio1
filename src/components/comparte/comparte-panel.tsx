@@ -40,13 +40,32 @@ export function CompartePanel({ vendedores, config, sesion }: {
   }
 
   function copiar(url: string) {
-    navigator.clipboard.writeText(url);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => toast.success("¡Link copiado!")).catch(() => copiarFallback(url));
+    } else {
+      copiarFallback(url);
+    }
+  }
+
+  function copiarFallback(url: string) {
+    const el = document.createElement("textarea");
+    el.value = url;
+    el.style.position = "fixed";
+    el.style.opacity = "0";
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand("copy");
+    document.body.removeChild(el);
     toast.success("¡Link copiado!");
   }
 
   async function generarQR(url: string) {
-    const dataUrl = await QRCode.toDataURL(url, { width: 300, margin: 2 });
-    setQrUrl(dataUrl);
+    try {
+      const dataUrl = await QRCode.toDataURL(url, { width: 300, margin: 2 });
+      setQrUrl(dataUrl);
+    } catch (e) {
+      toast.error("Error al generar QR");
+    }
   }
 
   return (
