@@ -25,7 +25,6 @@ const MENU_SECUNDARIO = [
   { href: "/completados", icono: Trophy, etiqueta: "Completados", color: "text-emerald-600" },
   { href: "/perdidos", icono: XCircle, etiqueta: "Perdidos", color: "text-slate-500" },
   { href: "/archivados", icono: Archive, etiqueta: "Archivados", color: "text-stone-500" },
-  { href: "/equipo/agenda", icono: CalendarPlus, etiqueta: "Páginas de Agenda", color: "text-teal-500" },
   { href: "/equipo", icono: UserCog, etiqueta: "Equipo", color: "text-cyan-500" },
   { href: "/comparte", icono: Share2, etiqueta: "Comparte y Crece", color: "text-marca" },
 ];
