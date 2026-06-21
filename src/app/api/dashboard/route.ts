@@ -103,12 +103,12 @@ export async function GET(req: NextRequest) {
     const pronostico = Math.round(valorEmbudo * (tasaCierre / 100));
 
     // Historical 6 months
-    const historico: Array<{ mes: string; ingresos: number; clientes: number; citas: number }> = [];
+    const historico: Array<{ mes: string; ingresos: number; clientesGanados: number }> = [];
     for (let i = 5; i >= 0; i--) {
       const mesDate = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1);
       const finMesHist = new Date(mesDate.getFullYear(), mesDate.getMonth() + 1, 0, 23, 59, 59, 999);
 
-      const [ingresosHist, clientesHist, citasHist] = await Promise.all([
+      const [ingresosHist, clientesHist] = await Promise.all([
         prisma.pago.aggregate({
           where: {
             eliminadoEn: null,
@@ -125,23 +125,43 @@ export async function GET(req: NextRequest) {
         prisma.cliente.count({
           where: { ...baseCliente, estado: "GANADO", ultimoContactoEn: { gte: mesDate, lte: finMesHist } },
         }),
-        prisma.cita.count({
-          where: {
-            eliminadoEn: null,
-            ...(sesion.rol === "VENDEDOR" ? { vendedorId: sesion.id } : vendedorIdParam ? { vendedorId: vendedorIdParam } : {}),
-            fecha: { gte: mesDate, lte: finMesHist },
-            estado: { not: "CANCELADA" },
-          },
-        }),
       ]);
 
       historico.push({
-        mes: mesDate.toISOString().slice(0, 7),
+        mes: mesDate.toLocaleDateString("es-MX", { month: "short", year: "2-digit" }),
         ingresos: ingresosHist._sum.monto ?? 0,
-        clientes: clientesHist,
-        citas: citasHist,
+        clientesGanados: clientesHist,
       });
     }
+
+    // Origen de leads este mes
+    const origenLeadsRaw = await prisma.cliente.groupBy({
+      by: ["origen"],
+      where: { ...baseCliente, creadoEn: { gte: inicioMes, lte: finMes } },
+      _count: { id: true },
+      orderBy: { _count: { id: "desc" } },
+    });
+    const origenLeads = origenLeadsRaw.map((o) => ({ origen: o.origen, _count: { id: o._count.id } }));
+
+    // Motivos de pérdida
+    const motivosPerdidaRaw = await prisma.cliente.groupBy({
+      by: ["motivoPerdida"],
+      where: { ...baseCliente, estado: "PERDIDO" },
+      _count: { id: true },
+      orderBy: { _count: { id: "desc" } },
+    });
+    const motivosPerdida = motivosPerdidaRaw.map((m) => ({ motivoPerdida: m.motivoPerdida, _count: { id: m._count.id } }));
+
+    // Config del negocio para meta
+    const config = await prisma.configNegocio.findFirst({ where: { id: "principal" } });
+    const metaMensual = config?.metaMensualDinero ?? 100000;
+
+    // Días restantes en el mes
+    const diasRestantes = Math.ceil((finMes.getTime() - ahora.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Semáforo
+    const porcentajeMeta = metaMensual > 0 ? (ingresosCobrados / metaMensual) * 100 : 0;
+    const semaforo = porcentajeMeta >= 80 ? "verde" : porcentajeMeta >= 50 ? "amarillo" : "rojo";
 
     return NextResponse.json({
       ok: true,
@@ -157,6 +177,11 @@ export async function GET(req: NextRequest) {
         valorEmbudo,
         pronostico,
         historico,
+        origenLeads,
+        motivosPerdida,
+        metaMensual,
+        diasRestantes,
+        semaforo,
       },
     });
   } catch (e) {
