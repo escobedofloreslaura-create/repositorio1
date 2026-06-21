@@ -101,6 +101,7 @@ export async function POST(req: NextRequest) {
 
     const assignedVendedor = sesion.rol === "VENDEDOR" ? sesion.id : (vendedorId ?? sesion.id);
 
+    const { proximaAccionFecha, ...restoSinFecha } = resto as Record<string, unknown>;
     const cliente = await prisma.cliente.create({
       data: {
         nombre,
@@ -110,7 +111,8 @@ export async function POST(req: NextRequest) {
         etapa: etapa ?? "PROSPECTO",
         vendedorId: assignedVendedor,
         ultimoContactoEn: new Date(),
-        ...resto,
+        proximaAccionFecha: proximaAccionFecha ? new Date(proximaAccionFecha as string) : null,
+        ...restoSinFecha,
       },
     });
 
