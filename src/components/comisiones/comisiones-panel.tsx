@@ -198,7 +198,7 @@ export function ComisionesPanel({ sesion }: { sesion: SesionUsuario }) {
         <div className="space-y-3">
           <Select label="Tipo" opciones={TIPOS} value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))} />
           <Select label="Aseguradora *" opciones={ASEGURADORAS} value={form.aseguradora} onChange={e => setForm(f => ({ ...f, aseguradora: e.target.value }))} />
-          <Campo label="Monto ($) *" type="number" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} placeholder="0.00" />
+          <Campo label="Monto ($) *" type="text" inputMode="decimal" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} placeholder="0.00" />
           <Campo label="Fecha *" type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} />
           <div>
             <label className="block text-sm font-medium text-texto mb-1">Cliente (opcional)</label>

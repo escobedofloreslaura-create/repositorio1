@@ -162,7 +162,7 @@ export function PolizasPanel({ clienteId }: { clienteId: string }) {
           <Select label="Aseguradora *" opciones={ASEGURADORAS} value={form.aseguradora} onChange={e => setForm(f => ({ ...f, aseguradora: e.target.value }))} />
           <Select label="Forma de pago" opciones={FORMAS_PAGO} value={form.formaPago} onChange={e => setForm(f => ({ ...f, formaPago: e.target.value }))} />
           <Campo label="Fecha próximo pago" type="date" value={form.fechaProximoPago} onChange={e => setForm(f => ({ ...f, fechaProximoPago: e.target.value }))} />
-          <Campo label="Monto ($)" type="number" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} placeholder="0.00" />
+          <Campo label="Monto ($)" type="text" inputMode="decimal" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} placeholder="0.00" />
           <Campo label="Notas (opcional)" value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones..." />
         </div>
         <div className="flex gap-3 mt-5">
