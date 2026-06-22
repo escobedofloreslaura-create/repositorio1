@@ -38,6 +38,7 @@ model Usuario {
   favoritos          Favorito[]
   vistasGuardadas    VistaGuardada[]
   sesiones           SesionToken[]
+  comisiones         Comision[]
 
   @@index([correo])
 }
@@ -108,6 +109,7 @@ model Cliente {
   recordatorios    Recordatorio[]
   favoritos        Favorito[]
   polizas          Poliza[]
+  comisiones       Comision[]
 
   @@index([nombre])
   @@index([telefono])
@@ -138,6 +140,29 @@ model Poliza {
   cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 
   @@index([clienteId])
+}
+
+// ─── COMISIONES ──────────────────────────────────────────────────────────────
+
+model Comision {
+  id          String   @id @default(cuid())
+  vendedorId  String
+  clienteId   String?
+  polizaId    String?
+  tipo        String   @default("COMISION") // COMISION | BONO
+  aseguradora String   // SEGUROS_MONTERREY | ALLIANZ
+  monto       Float
+  fecha       DateTime
+  notas       String?
+  creadoEn    DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  vendedor Usuario  @relation(fields: [vendedorId], references: [id])
+  cliente  Cliente? @relation(fields: [clienteId], references: [id])
+
+  @@index([vendedorId])
+  @@index([clienteId])
+  @@index([fecha])
 }
 
 // ─── CITAS ───────────────────────────────────────────────────────────────────

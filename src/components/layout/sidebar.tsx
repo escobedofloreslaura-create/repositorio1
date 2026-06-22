@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, KanbanSquare, CalendarDays, Wallet, ListChecks,
   Trophy, XCircle, Archive, CalendarPlus, UserCog, Share2, ShieldCheck,
-  LogOut, User, Settings, HelpCircle, ChevronDown,
+  LogOut, User, Settings, HelpCircle, ChevronDown, TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { iniciales } from "@/lib/formato";
@@ -18,6 +18,7 @@ const MENU_PRINCIPAL = [
   { href: "/embudo", icono: KanbanSquare, etiqueta: "Embudo", color: "text-indigo-500" },
   { href: "/agenda", icono: CalendarDays, etiqueta: "Agenda", color: "text-green-500" },
   { href: "/pagos", icono: Wallet, etiqueta: "Pagos", color: "text-emerald-500" },
+  { href: "/comisiones", icono: TrendingUp, etiqueta: "Mis Ingresos", color: "text-green-600" },
   { href: "/seguimiento", icono: ListChecks, etiqueta: "Seguimiento", color: "text-amber-500" },
 ];
 
