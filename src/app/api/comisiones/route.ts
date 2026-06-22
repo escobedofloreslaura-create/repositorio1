@@ -10,25 +10,17 @@ export async function GET(req: NextRequest) {
   const mes = searchParams.get("mes"); // YYYY-MM
   const vendedorId = sesion.rol === "VENDEDOR" ? sesion.id : (searchParams.get("vendedorId") ?? undefined);
 
-  const where: Record<string, unknown> = {};
-  if (vendedorId) where.vendedorId = vendedorId;
-  if (mes) {
-    const [year, month] = mes.split("-").map(Number);
-    where.fecha = {
-      gte: new Date(year, month - 1, 1),
-      lt: new Date(year, month, 1),
-    };
-  }
-
   const comisiones = await prisma.comision.findMany({
-    where,
+    where: {
+      ...(vendedorId ? { vendedorId } : {}),
+      ...(mes ? (() => { const [y, m] = mes.split("-").map(Number); return { fecha: { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) } }; })() : {}),
+    },
     orderBy: { fecha: "desc" },
     include: { cliente: { select: { id: true, nombre: true } } },
   });
 
-  // Resumen
-  const totalComisiones = comisiones.filter(c => c.tipo === "COMISION").reduce((s, c) => s + c.monto, 0);
-  const totalBonos = comisiones.filter(c => c.tipo === "BONO").reduce((s, c) => s + c.monto, 0);
+  const totalComisiones = comisiones.filter((c) => c.tipo === "COMISION").reduce((s, c) => s + c.monto, 0);
+  const totalBonos = comisiones.filter((c) => c.tipo === "BONO").reduce((s, c) => s + c.monto, 0);
 
   return NextResponse.json({ ok: true, data: comisiones, totalComisiones, totalBonos, total: totalComisiones + totalBonos });
 }

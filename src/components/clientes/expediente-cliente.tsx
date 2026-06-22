@@ -37,6 +37,7 @@ interface ClienteCompleto {
   empresaPuesto: string | null;
   origen: string | null;
   motivoPerdida: string | null;
+  productosInteres: string | null;
   vendedor: { id: string; nombre: string } | null;
   citas: Array<{ id: string; fecha: Date | string; estado: string; notas: string | null }>;
   pagos: Array<{ id: string; monto: number; montoTotal: number | null; metodo: string; estatus: string; fechaPago: Date | string | null }>;
