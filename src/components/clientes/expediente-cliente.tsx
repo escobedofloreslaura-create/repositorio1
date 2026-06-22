@@ -11,7 +11,13 @@ import { Campo, Select } from "@/components/ui/campo";
 import { formatearFechaHumana, telefonoWhatsApp } from "@/lib/formato";
 import { OBJECIONES } from "@/lib/constantes";
 import { PanelIA } from "@/components/ia/panel-ia";
+import { PolizasPanel } from "@/components/clientes/polizas-panel";
 import toast from "react-hot-toast";
+
+const PRODUCTOS_INTERES = [
+  "Seguro Educativo", "Plan de Retiro", "Seguro de Vida", "Gastos Médicos Mayores",
+  "Inversión", "Seguro de Auto", "Plan de Ahorro", "Vida Mujer",
+];
 
 interface ClienteCompleto {
   id: string;
@@ -173,6 +179,38 @@ export function ExpedienteCliente({ cliente: c, sesion }: { cliente: ClienteComp
           </Tarjeta>
         )}
       </div>
+
+      {/* Pólizas */}
+      <PolizasPanel clienteId={c.id} />
+
+      {/* Productos de interés y próximo contacto */}
+      <Tarjeta>
+        <h2 className="font-semibold text-texto mb-3">Intereses y seguimiento</h2>
+        <div className="space-y-3 text-sm">
+          {c.productosInteres && (
+            <div>
+              <span className="text-texto-suave text-xs uppercase tracking-wide">Productos de interés</span>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {c.productosInteres.split(",").map(p => p.trim()).filter(Boolean).map(p => (
+                  <span key={p} className="px-2 py-0.5 rounded-full bg-marca-suave text-marca text-xs">{p}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {c.proximaAccion && (
+            <div>
+              <span className="text-texto-suave text-xs uppercase tracking-wide">Próxima acción</span>
+              <p className="text-texto mt-0.5">{c.proximaAccion}</p>
+            </div>
+          )}
+          {c.proximaAccionFecha && (
+            <div>
+              <span className="text-texto-suave text-xs uppercase tracking-wide">Fecha de próximo contacto</span>
+              <p className="text-texto mt-0.5">{new Date(c.proximaAccionFecha).toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
+            </div>
+          )}
+        </div>
+      </Tarjeta>
 
       {/* Pagos */}
       <Tarjeta>

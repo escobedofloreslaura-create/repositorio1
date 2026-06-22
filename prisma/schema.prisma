@@ -107,6 +107,7 @@ model Cliente {
   etiquetasCliente EtiquetaCliente[]
   recordatorios    Recordatorio[]
   favoritos        Favorito[]
+  polizas          Poliza[]
 
   @@index([nombre])
   @@index([telefono])
@@ -116,6 +117,27 @@ model Cliente {
   @@index([vendedorId])
   @@index([eliminadoEn])
   @@index([empresaNombre])
+}
+
+// ─── PÓLIZAS ─────────────────────────────────────────────────────────────────
+
+model Poliza {
+  id                  String    @id @default(cuid())
+  clienteId           String
+  numeroPoliza        String
+  producto            String    // SEGURO_EDUCATIVO | PLAN_RETIRO | SEGURO_VIDA | GASTOS_MEDICOS | INVERSION | SEGURO_AUTO | PLAN_AHORRO | VIDA_MUJER
+  aseguradora         String    // SEGUROS_MONTERREY | ALLIANZ
+  formaPago           String    @default("MENSUAL") // MENSUAL | TRIMESTRAL | SEMESTRAL | ANUAL
+  fechaProximoPago    DateTime?
+  monto               Float?
+  notas               String?
+  activa              Boolean   @default(true)
+  creadoEn            DateTime  @default(now())
+  actualizadoEn       DateTime  @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
 }
 
 // ─── CITAS ───────────────────────────────────────────────────────────────────
