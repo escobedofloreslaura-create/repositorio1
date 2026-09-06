@@ -1,5 +1,6 @@
 import { formatearMoneda, formatearFechaHumana } from "@/lib/formato";
 import { ETIQUETAS_FORMA_PAGO, type FormaPago } from "@/lib/pos/constantes";
+import { escpos, qzImprimirRaw } from "@/lib/pos/qz";
 
 interface ItemTicketImprimir {
   descripcion: string;
@@ -20,11 +21,7 @@ interface ConfigTicket {
   simboloMoneda: string;
 }
 
-function escaparHtml(texto: string): string {
-  return texto.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-}
-
-export function imprimirTicket(params: {
+export interface DatosTicket {
   folio: number;
   fecha: string | Date;
   cajero: string;
@@ -33,7 +30,13 @@ export function imprimirTicket(params: {
   pagos: PagoTicketImprimir[];
   total: number;
   config: ConfigTicket;
-}) {
+}
+
+function escaparHtml(texto: string): string {
+  return texto.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
+export function imprimirTicket(params: DatosTicket) {
   const { folio, fecha, cajero, cliente, items, pagos, total, config } = params;
   const moneda = (m: number) => formatearMoneda(m, config.simboloMoneda);
 
@@ -99,4 +102,82 @@ export function imprimirTicket(params: {
   ventana.document.open();
   ventana.document.write(html);
   ventana.document.close();
+}
+
+// ─── Impresión térmica silenciosa (ESC/POS vía QZ Tray) ───────────────────────
+// 32 caracteres por línea: es el ancho más chico común (papel de 58mm) por lo
+// que también cabe, con margen, en tickets de 80mm.
+const ANCHO_TICKET = 32;
+
+function envolverTexto(texto: string, ancho = ANCHO_TICKET): string[] {
+  const palabras = texto.split(" ");
+  const lineas: string[] = [];
+  let actual = "";
+  for (const palabra of palabras) {
+    const propuesta = actual ? `${actual} ${palabra}` : palabra;
+    if (propuesta.length > ancho && actual) {
+      lineas.push(actual);
+      actual = palabra;
+    } else {
+      actual = propuesta;
+    }
+  }
+  if (actual) lineas.push(actual);
+  return lineas.length > 0 ? lineas : [""];
+}
+
+function filaDosColumnas(izquierda: string, derecha: string, ancho = ANCHO_TICKET): string {
+  const espacio = Math.max(1, ancho - izquierda.length - derecha.length);
+  return izquierda + " ".repeat(espacio) + derecha + "\n";
+}
+
+export function construirComandosTicket(params: DatosTicket): string[] {
+  const { folio, fecha, cajero, cliente, items, pagos, total, config } = params;
+  const moneda = (m: number) => formatearMoneda(m, config.simboloMoneda);
+  const linea = "-".repeat(ANCHO_TICKET) + "\n";
+  const cmds: string[] = [];
+
+  cmds.push(escpos.inicializar, escpos.centrar, escpos.negritaOn, escpos.dobleAltoOn);
+  envolverTexto(config.nombreNegocio, 16).forEach((l) => cmds.push(l + "\n"));
+  cmds.push(escpos.dobleAltoOff, escpos.negritaOff);
+  if (config.direccion) envolverTexto(config.direccion).forEach((l) => cmds.push(l + "\n"));
+  if (config.telefono) cmds.push(`Tel: ${config.telefono}\n`);
+  cmds.push(escpos.izquierda, linea);
+  cmds.push(`Ticket: #${folio}\n`, `Fecha: ${formatearFechaHumana(fecha)}\n`, `Cajero: ${cajero}\n`);
+  if (cliente) cmds.push(`Cliente: ${cliente}\n`);
+  cmds.push(linea);
+
+  for (const item of items) {
+    envolverTexto(item.descripcion).forEach((l) => cmds.push(l + "\n"));
+    cmds.push(filaDosColumnas(`${item.cantidad} x ${moneda(item.precioUnitario)}`, moneda(item.cantidad * item.precioUnitario)));
+  }
+  cmds.push(linea, escpos.negritaOn, filaDosColumnas("TOTAL", moneda(total)), escpos.negritaOff, linea);
+
+  for (const pago of pagos) cmds.push(filaDosColumnas(ETIQUETAS_FORMA_PAGO[pago.forma], moneda(pago.monto)));
+  cmds.push(linea, escpos.centrar);
+  envolverTexto(config.mensajeTicket).forEach((l) => cmds.push(l + "\n"));
+  cmds.push(escpos.salto, escpos.salto, escpos.salto, escpos.cortar);
+
+  return cmds;
+}
+
+/**
+ * Intenta imprimir en silencio en la impresora térmica configurada vía QZ
+ * Tray (sin diálogo de impresión); si QZ Tray no está instalado/corriendo,
+ * o no hay impresora configurada, cae de vuelta al diálogo del navegador.
+ */
+export async function imprimirTicketAutomatico(
+  params: DatosTicket,
+  impresoraQz: string | null | undefined
+): Promise<"qz" | "navegador"> {
+  if (impresoraQz) {
+    try {
+      await qzImprimirRaw(impresoraQz, construirComandosTicket(params));
+      return "qz";
+    } catch (e) {
+      console.warn("No se pudo imprimir vía QZ Tray, usando el diálogo del navegador:", e);
+    }
+  }
+  imprimirTicket(params);
+  return "navegador";
 }

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Campo } from "@/components/ui/campo";
 import { formatearMoneda, formatearFechaHumana } from "@/lib/formato";
 import { ETIQUETAS_FORMA_PAGO, type FormaPago } from "@/lib/pos/constantes";
-import { imprimirTicket } from "@/lib/pos/imprimir-ticket";
+import { imprimirTicketAutomatico } from "@/lib/pos/imprimir-ticket";
 import { Printer } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -54,16 +54,22 @@ export function ModalDetalleVenta({ ventaId, onCerrar, onCambio }: { ventaId: st
     const res = await fetch("/api/pos/config");
     const json = await res.json();
     if (!json.ok) return toast.error("No se pudo cargar la configuración del ticket");
-    imprimirTicket({
-      folio: venta.folio,
-      fecha: venta.fecha,
-      cajero: venta.usuario.nombre,
-      cliente: venta.cliente?.nombre ?? null,
-      items: venta.detalles.map((d) => ({ descripcion: d.producto?.nombre ?? d.descripcion, cantidad: d.cantidad, precioUnitario: d.precioUnitario })),
-      pagos: venta.pagos,
-      total: venta.total,
-      config: json.data,
-    });
+    const via = await imprimirTicketAutomatico(
+      {
+        folio: venta.folio,
+        fecha: venta.fecha,
+        cajero: venta.usuario.nombre,
+        cliente: venta.cliente?.nombre ?? null,
+        items: venta.detalles.map((d) => ({ descripcion: d.producto?.nombre ?? d.descripcion, cantidad: d.cantidad, precioUnitario: d.precioUnitario })),
+        pagos: venta.pagos,
+        total: venta.total,
+        config: json.data,
+      },
+      json.data.impresora
+    );
+    if (via === "navegador" && json.data.impresora) {
+      toast("No se pudo conectar con QZ Tray, se abrió el diálogo de impresión.", { icon: "⚠️" });
+    }
   }
 
   useEffect(() => { cargar(); }, [ventaId]); // eslint-disable-line react-hooks/exhaustive-deps
