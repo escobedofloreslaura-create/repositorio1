@@ -14,8 +14,22 @@ const RUTAS_PUBLICAS = [
   "/apple-touch",
 ];
 
+const RUTAS_POS_PUBLICAS = ["/pos/login", "/api/pos/auth/"];
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // ── Módulo POS (Vinos y Licores) — independiente del CRM ──────────────────
+  if (pathname.startsWith("/pos") || pathname.startsWith("/api/pos")) {
+    const esPublicaPos = RUTAS_POS_PUBLICAS.some((r) => pathname.startsWith(r));
+    if (esPublicaPos) return NextResponse.next();
+
+    const tokenPos = request.cookies.get("pos_session")?.value;
+    if (!tokenPos) {
+      return NextResponse.redirect(new URL("/pos/login", request.url));
+    }
+    return NextResponse.next();
+  }
 
   const esPublica = RUTAS_PUBLICAS.some((r) => pathname.startsWith(r));
   if (esPublica) return NextResponse.next();
