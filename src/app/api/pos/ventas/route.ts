@@ -4,6 +4,7 @@ import { requerirSesionPos } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 import { registrarMovimientoInventario } from "@/lib/pos/kardex";
 import { siguienteFolioVenta } from "@/lib/pos/folio";
+import { TIPO_VENTA_POR_FORMA } from "@/lib/pos/constantes";
 
 interface ItemEntrada {
   productoId?: string;
@@ -153,11 +154,7 @@ export async function POST(req: NextRequest) {
           data: { ventaId: nuevaVenta.id, forma: pago.forma, monto: pago.monto },
         });
 
-        const tipoMovimiento =
-          pago.forma === "EFECTIVO" ? "VENTA_EFECTIVO" :
-          pago.forma === "TARJETA" ? "VENTA_TARJETA" :
-          pago.forma === "TRANSFERENCIA" ? "VENTA_TRANSFERENCIA" :
-          null;
+        const tipoMovimiento = TIPO_VENTA_POR_FORMA[pago.forma];
 
         if (tipoMovimiento) {
           await tx.posMovimientoCaja.create({

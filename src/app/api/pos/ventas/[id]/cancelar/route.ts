@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requerirSesionPos } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 import { registrarMovimientoInventario } from "@/lib/pos/kardex";
+import { TIPO_VENTA_POR_FORMA, type FormaPago } from "@/lib/pos/constantes";
 
 // Cancela una venta completa: reintegra el stock al inventario y descuenta
 // el dinero pagado de la caja del turno correspondiente.
@@ -35,25 +36,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
       }
 
-      const tipoPorForma: Record<string, string> = {
-        EFECTIVO: "VENTA_EFECTIVO",
-        TARJETA: "VENTA_TARJETA",
-        TRANSFERENCIA: "VENTA_TRANSFERENCIA",
-      };
-
       for (const pago of venta.pagos) {
-        if (pago.forma === "CREDITO" && venta.clienteId) {
+        const forma = pago.forma as FormaPago;
+        if (forma === "CREDITO" && venta.clienteId) {
           await tx.posCliente.update({
             where: { id: venta.clienteId },
             data: { saldoActual: { decrement: pago.monto } },
           });
-        } else if (tipoPorForma[pago.forma]) {
+        } else if (TIPO_VENTA_POR_FORMA[forma]) {
           // Se registra en el mismo rubro (efectivo/tarjeta/transferencia) con
           // signo negativo para que el corte de caja lo neteé correctamente.
           await tx.posMovimientoCaja.create({
             data: {
               turnoId: venta.turnoId,
-              tipo: tipoPorForma[pago.forma],
+              tipo: TIPO_VENTA_POR_FORMA[forma]!,
               monto: -pago.monto,
               concepto: `Cancelación de venta #${venta.folio}${motivo ? `: ${motivo}` : ""}`,
               usuarioId: sesion.id,

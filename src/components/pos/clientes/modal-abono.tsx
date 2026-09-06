@@ -1,12 +1,16 @@
 "use client";
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
-import { Campo } from "@/components/ui/campo";
+import { Campo, Select } from "@/components/ui/campo";
 import { Boton } from "@/components/ui/boton";
+import { ETIQUETAS_FORMA_PAGO } from "@/lib/pos/constantes";
 import toast from "react-hot-toast";
+
+const FORMAS_ABONO = ["EFECTIVO", "TARJETA", "TRANSFERENCIA"] as const;
 
 export function ModalAbono({ clienteId, onCerrar, onRegistrado }: { clienteId: string; onCerrar: () => void; onRegistrado: () => void }) {
   const [monto, setMonto] = useState("");
+  const [forma, setForma] = useState<(typeof FORMAS_ABONO)[number]>("EFECTIVO");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
@@ -24,7 +28,7 @@ export function ModalAbono({ clienteId, onCerrar, onRegistrado }: { clienteId: s
       const res = await fetch(`/api/pos/clientes/${clienteId}/abono`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ monto: Number(monto), turnoId: jsonTurno.data.id }),
+        body: JSON.stringify({ monto: Number(monto), forma, turnoId: jsonTurno.data.id }),
       });
       const json = await res.json();
       if (!json.ok) {
@@ -44,6 +48,12 @@ export function ModalAbono({ clienteId, onCerrar, onRegistrado }: { clienteId: s
     <Modal abierto onCerrar={onCerrar} titulo="Cobrar a cliente">
       <form onSubmit={handleSubmit} className="space-y-4">
         <Campo label="Monto recibido" type="number" min={0.01} step="0.01" required value={monto} onChange={(e) => setMonto(e.target.value)} autoFocus />
+        <Select
+          label="Forma de pago"
+          value={forma}
+          onChange={(e) => setForma(e.target.value as typeof forma)}
+          opciones={FORMAS_ABONO.map((f) => ({ valor: f, etiqueta: ETIQUETAS_FORMA_PAGO[f] }))}
+        />
         {error && <p className="text-sm text-peligro">{error}</p>}
         <div className="flex gap-2">
           <Boton type="button" variante="secundario" className="flex-1" onClick={onCerrar}>Cancelar</Boton>
