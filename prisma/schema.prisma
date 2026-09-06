@@ -370,3 +370,281 @@ model ContadorFolio {
   id     String @id @default("pagos")
   ultimo Int    @default(0)
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PUNTO DE VENTA — VINOS Y LICORES
+// Módulo independiente del CRM de seguros. No comparte modelos, sesiones
+// ni rutas con lo anterior — todo prefijado con "Pos".
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── POS · USUARIOS (Cajeros y Administradores) ──────────────────────────────
+
+model PosUsuario {
+  id               String    @id @default(cuid())
+  nombre           String
+  usuario          String    @unique
+  contrasenaHash   String
+  rol              String    @default("CAJERO") // ADMINISTRADOR | CAJERO
+  activo           Boolean   @default(true)
+  intentosFallidos Int       @default(0)
+  bloqueadoHasta   DateTime?
+  creadoEn         DateTime  @default(now())
+  actualizadoEn    DateTime  @updatedAt
+
+  sesiones              PosSesionToken[]
+  turnos                PosTurno[]
+  ventas                PosVenta[]
+  movimientosCaja       PosMovimientoCaja[]
+  movimientosInventario PosMovimientoInventario[]
+  devoluciones          PosDevolucion[]
+  cortesCaja            PosCorteCaja[]
+
+  @@index([usuario])
+}
+
+model PosSesionToken {
+  id        String   @id @default(cuid())
+  usuarioId String
+  token     String   @unique
+  expiraEn  DateTime
+  creadoEn  DateTime @default(now())
+
+  usuario PosUsuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+}
+
+// ─── POS · CATÁLOGO ───────────────────────────────────────────────────────────
+
+model PosDepartamento {
+  id     String @id @default(cuid())
+  nombre String @unique
+  orden  Int    @default(0)
+
+  productos PosProducto[]
+}
+
+model PosProducto {
+  id               String   @id @default(cuid())
+  codigoBarras     String?  @unique
+  nombre           String
+  departamentoId   String
+  unidad           String   @default("PIEZA") // PIEZA | CAJA
+  precioCosto      Float    @default(0)
+  precioVenta      Float    @default(0)
+  precioMayoreo    Float?
+  existencia       Float    @default(0)
+  existenciaMinima Float    @default(5)
+  activo           Boolean  @default(true)
+  creadoEn         DateTime @default(now())
+  actualizadoEn    DateTime @updatedAt
+
+  departamento  PosDepartamento           @relation(fields: [departamentoId], references: [id])
+  detallesVenta PosDetalleVenta[]
+  movimientos   PosMovimientoInventario[]
+
+  @@index([nombre])
+  @@index([departamentoId])
+  @@index([codigoBarras])
+}
+
+// ─── POS · CLIENTES (crédito) ─────────────────────────────────────────────────
+
+model PosCliente {
+  id            String   @id @default(cuid())
+  nombre        String
+  direccion     String?
+  telefono      String?
+  limiteCredito Float    @default(0)
+  saldoActual   Float    @default(0)
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  ventas PosVenta[]
+
+  @@index([nombre])
+}
+
+// ─── POS · TURNO Y CAJA ───────────────────────────────────────────────────────
+
+model PosTurno {
+  id           String    @id @default(cuid())
+  usuarioId    String
+  fondoInicial Float     @default(0)
+  abiertoEn    DateTime  @default(now())
+  cerradoEn    DateTime?
+  estado       String    @default("ABIERTO") // ABIERTO | CERRADO
+
+  usuario     PosUsuario          @relation(fields: [usuarioId], references: [id])
+  movimientos PosMovimientoCaja[]
+  ventas      PosVenta[]
+  corte       PosCorteCaja?
+
+  @@index([usuarioId])
+  @@index([estado])
+}
+
+model PosMovimientoCaja {
+  id        String   @id @default(cuid())
+  turnoId   String
+  tipo      String // FONDO_INICIAL | VENTA_EFECTIVO | VENTA_TARJETA | VENTA_TRANSFERENCIA | COBRO_CLIENTE | SALIDA | PAGO_PROVEEDOR | ENTRADA_MANUAL | CANCELACION | DEVOLUCION
+  monto     Float
+  concepto  String?
+  usuarioId String
+  ventaId   String?
+  clienteId String?
+  creadoEn  DateTime @default(now())
+
+  turno   PosTurno   @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  usuario PosUsuario @relation(fields: [usuarioId], references: [id])
+  venta   PosVenta?  @relation(fields: [ventaId], references: [id])
+
+  @@index([turnoId])
+  @@index([tipo])
+}
+
+model PosCorteCaja {
+  id                    String   @id @default(cuid())
+  turnoId               String   @unique
+  fecha                 DateTime @default(now())
+  fondoInicial          Float
+  totalEfectivo         Float
+  totalTarjeta          Float
+  totalTransferencia    Float
+  totalCobroClientes    Float
+  totalPagoProveedores  Float
+  totalSalidas          Float
+  totalEntradasManuales Float
+  ventasTotales         Float
+  costoVentas           Float
+  gananciaReal          Float
+  efectivoEsperado      Float
+  usuarioId             String
+  creadoEn              DateTime @default(now())
+
+  turno   PosTurno   @relation(fields: [turnoId], references: [id])
+  usuario PosUsuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([fecha])
+}
+
+// ─── POS · VENTAS ──────────────────────────────────────────────────────────────
+
+model PosVenta {
+  id          String    @id @default(cuid())
+  folio       Int
+  turnoId     String
+  clienteId   String?
+  usuarioId   String
+  fecha       DateTime  @default(now())
+  subtotal    Float
+  total       Float
+  estado      String    @default("COMPLETADA") // COMPLETADA | CANCELADA
+  notas       String?
+  canceladaEn DateTime?
+  creadoEn    DateTime  @default(now())
+
+  turno           PosTurno            @relation(fields: [turnoId], references: [id])
+  cliente         PosCliente?         @relation(fields: [clienteId], references: [id])
+  usuario         PosUsuario          @relation(fields: [usuarioId], references: [id])
+  detalles        PosDetalleVenta[]
+  pagos           PosPagoVenta[]
+  movimientosCaja PosMovimientoCaja[]
+  devoluciones    PosDevolucion[]
+
+  @@index([folio])
+  @@index([turnoId])
+  @@index([clienteId])
+  @@index([fecha])
+  @@index([estado])
+}
+
+model PosDetalleVenta {
+  id               String  @id @default(cuid())
+  ventaId          String
+  productoId       String?
+  descripcion      String
+  cantidad         Float
+  precioUnitario   Float
+  costoUnitario    Float   @default(0)
+  esMayoreo        Boolean @default(false)
+  subtotal         Float
+  cantidadDevuelta Float   @default(0)
+
+  venta    PosVenta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  producto PosProducto? @relation(fields: [productoId], references: [id])
+
+  @@index([ventaId])
+  @@index([productoId])
+}
+
+model PosPagoVenta {
+  id      String @id @default(cuid())
+  ventaId String
+  forma   String // EFECTIVO | TARJETA | TRANSFERENCIA | CREDITO
+  monto   Float
+
+  venta PosVenta @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+
+  @@index([ventaId])
+}
+
+model PosDevolucion {
+  id             String   @id @default(cuid())
+  ventaId        String
+  detalleVentaId String
+  cantidad       Float
+  monto          Float
+  motivo         String?
+  usuarioId      String
+  creadoEn       DateTime @default(now())
+
+  venta   PosVenta   @relation(fields: [ventaId], references: [id])
+  usuario PosUsuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([ventaId])
+}
+
+// ─── POS · INVENTARIO / KARDEX ────────────────────────────────────────────────
+
+model PosMovimientoInventario {
+  id                 String   @id @default(cuid())
+  productoId         String
+  tipo               String // ENTRADA | SALIDA | AJUSTE | VENTA | CANCELACION | DEVOLUCION
+  cantidad           Float
+  existenciaAnterior Float
+  existenciaNueva    Float
+  detalle            String?
+  usuarioId          String
+  ventaId            String?
+  creadoEn           DateTime @default(now())
+
+  producto PosProducto @relation(fields: [productoId], references: [id])
+  usuario  PosUsuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([productoId])
+  @@index([creadoEn])
+  @@index([tipo])
+}
+
+// ─── POS · CONFIGURACIÓN ───────────────────────────────────────────────────────
+
+model PosConfiguracion {
+  id            String   @id @default("principal")
+  nombreNegocio String   @default("Vinos y Licores")
+  direccion     String?
+  telefono      String?
+  rfc           String?
+  mensajeTicket String   @default("¡Gracias por su compra!")
+  logoUrl       String?
+  impresora     String?
+  moneda        String   @default("MXN")
+  simboloMoneda String   @default("$")
+  actualizadoEn DateTime @updatedAt
+}
+
+model PosContadorFolio {
+  id     String @id @default("ventas")
+  ultimo Int    @default(0)
+}

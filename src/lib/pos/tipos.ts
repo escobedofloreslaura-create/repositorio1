@@ -1,0 +1,68 @@
+export interface PosDepartamentoT {
+  id: string;
+  nombre: string;
+  orden: number;
+}
+
+export interface PosProductoT {
+  id: string;
+  codigoBarras: string | null;
+  nombre: string;
+  departamentoId: string;
+  departamento?: PosDepartamentoT;
+  unidad: "PIEZA" | "CAJA";
+  precioCosto: number;
+  precioVenta: number;
+  precioMayoreo: number | null;
+  existencia: number;
+  existenciaMinima: number;
+  activo: boolean;
+}
+
+export interface PosClienteT {
+  id: string;
+  nombre: string;
+  direccion: string | null;
+  telefono: string | null;
+  limiteCredito: number;
+  saldoActual: number;
+  activo: boolean;
+}
+
+export interface ItemTicket {
+  claveLocal: string;
+  productoId: string | null;
+  nombre: string;
+  cantidad: number;
+  precioUnitario: number;
+  precioNormal: number;
+  precioMayoreo: number | null;
+  esMayoreo: boolean;
+  existenciaDisponible: number | null;
+}
+
+export interface PosCorteT {
+  id: string;
+  fecha: string;
+  fondoInicial: number;
+  totalEfectivo: number;
+  totalTarjeta: number;
+  totalTransferencia: number;
+  totalCobroClientes: number;
+  totalPagoProveedores: number;
+  totalSalidas: number;
+  totalEntradasManuales: number;
+  ventasTotales: number;
+  costoVentas: number;
+  gananciaReal: number;
+  efectivoEsperado: number;
+  usuario: { nombre: string };
+}
+
+export interface Ticket {
+  id: string;
+  nombre: string;
+  items: ItemTicket[];
+  clienteId: string | null;
+  clienteNombre: string | null;
+}
