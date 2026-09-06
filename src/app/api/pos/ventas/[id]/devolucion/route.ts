@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requerirSesionPos } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 import { registrarMovimientoInventario } from "@/lib/pos/kardex";
+import { TIPO_VENTA_POR_FORMA, type FormaPago } from "@/lib/pos/constantes";
 
 // Devolución parcial: permite devolver un solo artículo de una venta previa.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -57,25 +58,42 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         },
       });
 
-      const pagoCredito = venta.pagos.find((p) => p.forma === "CREDITO");
-      if (pagoCredito && venta.clienteId) {
-        await tx.posCliente.update({
-          where: { id: venta.clienteId },
-          data: { saldoActual: { decrement: monto } },
-        });
-      } else {
-        const pagoEfectivo = venta.pagos.find((p) => p.forma === "EFECTIVO");
-        const tipo = pagoEfectivo ? "VENTA_EFECTIVO" : venta.pagos.some((p) => p.forma === "TARJETA") ? "VENTA_TARJETA" : "VENTA_TRANSFERENCIA";
-        await tx.posMovimientoCaja.create({
-          data: {
-            turnoId: venta.turnoId,
-            tipo,
-            monto: -monto,
-            concepto: `Devolución parcial de venta #${venta.folio}${motivo ? `: ${motivo}` : ""}`,
-            usuarioId: sesion.id,
-            ventaId: venta.id,
-          },
-        });
+      // El reembolso se reparte proporcionalmente entre las formas de pago
+      // originales de la venta (una venta puede estar pagada con varios
+      // métodos a la vez), en vez de cargarlo entero a un solo rubro —
+      // así el corte de caja neteé correctamente cada forma de pago.
+      if (venta.total > 0) {
+        let restante = Math.round(monto * 100) / 100;
+        for (const [i, pago] of venta.pagos.entries()) {
+          const esUltimo = i === venta.pagos.length - 1;
+          const proporcion = pago.monto / venta.total;
+          const montoPago = esUltimo ? restante : Math.min(restante, Math.round(monto * proporcion * 100) / 100);
+          restante = Math.round((restante - montoPago) * 100) / 100;
+          if (montoPago <= 0) continue;
+
+          const forma = pago.forma as FormaPago;
+          if (forma === "CREDITO" && venta.clienteId) {
+            await tx.posCliente.update({
+              where: { id: venta.clienteId },
+              data: { saldoActual: { decrement: montoPago } },
+            });
+            continue;
+          }
+
+          const tipo = TIPO_VENTA_POR_FORMA[forma];
+          if (!tipo) continue;
+          await tx.posMovimientoCaja.create({
+            data: {
+              turnoId: venta.turnoId,
+              tipo,
+              monto: -montoPago,
+              concepto: `Devolución parcial de venta #${venta.folio}${motivo ? `: ${motivo}` : ""}`,
+              usuarioId: sesion.id,
+              ventaId: venta.id,
+              clienteId: venta.clienteId,
+            },
+          });
+        }
       }
     });
 

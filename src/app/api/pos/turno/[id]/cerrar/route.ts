@@ -39,7 +39,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       const totalEfectivo = sumaPorTipo(movimientos, "VENTA_EFECTIVO");
       const totalTarjeta = sumaPorTipo(movimientos, "VENTA_TARJETA");
       const totalTransferencia = sumaPorTipo(movimientos, "VENTA_TRANSFERENCIA");
-      const totalCobroClientes = sumaPorTipo(movimientos, "COBRO_CLIENTE");
+      const totalCobroClientesEfectivo = sumaPorTipo(movimientos, "COBRO_CLIENTE_EFECTIVO");
+      // "Cobro a Clientes" se reporta junto (efectivo + tarjeta + transferencia),
+      // pero solo la parte en efectivo entra al efectivo esperado en caja.
+      const totalCobroClientes =
+        totalCobroClientesEfectivo +
+        sumaPorTipo(movimientos, "COBRO_CLIENTE_TARJETA") +
+        sumaPorTipo(movimientos, "COBRO_CLIENTE_TRANSFERENCIA");
       const totalPagoProveedores = sumaPorTipo(movimientos, "PAGO_PROVEEDOR");
       const totalSalidas = sumaPorTipo(movimientos, "SALIDA");
       const totalEntradasManuales = sumaPorTipo(movimientos, "ENTRADA_MANUAL");
@@ -48,7 +54,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         turno.fondoInicial +
         totalEfectivo +
         totalEntradasManuales +
-        totalCobroClientes -
+        totalCobroClientesEfectivo -
         totalSalidas -
         totalPagoProveedores;
 

@@ -98,6 +98,15 @@ export function PantallaVentas() {
     if (tickets.length <= 1) return;
     const ticket = tickets.find((t) => t.id === id);
     if (ticket && ticket.items.length > 0 && !confirm(`"${ticket.nombre}" tiene artículos sin cobrar. ¿Cerrarla de todas formas?`)) return;
+    quitarCuentaSinConfirmar(id);
+  }
+
+  // Cierra una cuenta sin preguntar: se usa justo después de un cobro exitoso,
+  // cuando el ticket todavía tiene los artículos ya pagados en su estado (por
+  // el closure de este render) y el diálogo de "tiene artículos sin cobrar"
+  // sería falso — la venta ya se registró en el servidor.
+  function quitarCuentaSinConfirmar(id: string) {
+    if (tickets.length <= 1) return;
     setTickets((prev) => prev.filter((t) => t.id !== id));
     if (ticketActivoId === id) {
       const restantes = tickets.filter((t) => t.id !== id);
@@ -225,7 +234,7 @@ export function PantallaVentas() {
       if (tickets.length === 1) {
         actualizarTicket(ticketActivo.id, (t) => ({ ...t, items: [], clienteId: null, clienteNombre: null }));
       } else {
-        cerrarCuenta(ticketActivo.id);
+        quitarCuentaSinConfirmar(ticketActivo.id);
       }
     } catch {
       toast.error("Error de conexión");
