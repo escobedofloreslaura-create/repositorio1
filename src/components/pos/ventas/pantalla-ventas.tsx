@@ -11,7 +11,7 @@ import { ModalAperturaCaja } from "./modal-apertura-caja";
 import { ModalSalidaCaja } from "./modal-salida-caja";
 import { ModalProductoComun } from "./modal-producto-comun";
 import { ModalCobro } from "./modal-cobro";
-import { imprimirTicket } from "@/lib/pos/imprimir-ticket";
+import { imprimirTicketAutomatico } from "@/lib/pos/imprimir-ticket";
 import type { PosProductoT, PosDepartamentoT, ItemTicket, Ticket } from "@/lib/pos/tipos";
 import type { FormaPago } from "@/lib/pos/constantes";
 
@@ -21,6 +21,7 @@ interface ConfigTicket {
   telefono: string | null;
   mensajeTicket: string;
   simboloMoneda: string;
+  impresora: string | null;
 }
 
 const STORAGE_KEY = "pos_tickets_v1";
@@ -203,15 +204,22 @@ export function PantallaVentas() {
       setModalCobro(false);
       setVersionCatalogo((v) => v + 1);
       if (config) {
-        imprimirTicket({
-          folio: json.data.folio,
-          fecha: json.data.fecha,
-          cajero: sesionNombre,
-          cliente: json.data.cliente?.nombre ?? null,
-          items: ticketActivo.items.map((i) => ({ descripcion: i.nombre, cantidad: i.cantidad, precioUnitario: i.precioUnitario })),
-          pagos,
-          total,
-          config,
+        imprimirTicketAutomatico(
+          {
+            folio: json.data.folio,
+            fecha: json.data.fecha,
+            cajero: sesionNombre,
+            cliente: json.data.cliente?.nombre ?? null,
+            items: ticketActivo.items.map((i) => ({ descripcion: i.nombre, cantidad: i.cantidad, precioUnitario: i.precioUnitario })),
+            pagos,
+            total,
+            config,
+          },
+          config.impresora
+        ).then((via) => {
+          if (via === "navegador" && config.impresora) {
+            toast("No se pudo conectar con QZ Tray, se abrió el diálogo de impresión.", { icon: "⚠️" });
+          }
         });
       }
       if (tickets.length === 1) {

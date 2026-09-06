@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Campo, Textarea } from "@/components/ui/campo";
 import { Boton } from "@/components/ui/boton";
+import { QzImpresora } from "./qz-impresora";
 import toast from "react-hot-toast";
 
 interface Config {
@@ -60,7 +61,7 @@ export function ConfiguracionPanel() {
           <Campo label="RFC" value={config.rfc ?? ""} onChange={(e) => set("rfc", e.target.value)} />
         </div>
         <Textarea label="Mensaje en el ticket" value={config.mensajeTicket} onChange={(e) => set("mensajeTicket", e.target.value)} />
-        <Campo label="Nombre de la impresora" value={config.impresora ?? ""} onChange={(e) => set("impresora", e.target.value)} placeholder="Ej. EPSON TM-T20" />
+        <QzImpresora impresora={config.impresora} onCambiar={(v) => set("impresora", v)} />
         <div className="grid grid-cols-2 gap-3">
           <Campo label="Moneda" value={config.moneda} onChange={(e) => set("moneda", e.target.value)} />
           <Campo label="Símbolo" value={config.simboloMoneda} onChange={(e) => set("simboloMoneda", e.target.value)} />
