@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Campo } from "@/components/ui/campo";
 import { formatearMoneda, formatearFechaHumana } from "@/lib/formato";
 import { ETIQUETAS_FORMA_PAGO, type FormaPago } from "@/lib/pos/constantes";
+import { imprimirTicket } from "@/lib/pos/imprimir-ticket";
+import { Printer } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface DetalleVenta {
@@ -45,6 +47,23 @@ export function ModalDetalleVenta({ ventaId, onCerrar, onCambio }: { ventaId: st
     const json = await res.json();
     if (json.ok) setVenta(json.data);
     setCargando(false);
+  }
+
+  async function reimprimir() {
+    if (!venta) return;
+    const res = await fetch("/api/pos/config");
+    const json = await res.json();
+    if (!json.ok) return toast.error("No se pudo cargar la configuración del ticket");
+    imprimirTicket({
+      folio: venta.folio,
+      fecha: venta.fecha,
+      cajero: venta.usuario.nombre,
+      cliente: venta.cliente?.nombre ?? null,
+      items: venta.detalles.map((d) => ({ descripcion: d.producto?.nombre ?? d.descripcion, cantidad: d.cantidad, precioUnitario: d.precioUnitario })),
+      pagos: venta.pagos,
+      total: venta.total,
+      config: json.data,
+    });
   }
 
   useEffect(() => { cargar(); }, [ventaId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -134,6 +153,10 @@ export function ModalDetalleVenta({ ventaId, onCerrar, onCambio }: { ventaId: st
               <Badge key={i} variante="neutro">{ETIQUETAS_FORMA_PAGO[p.forma]}: {formatearMoneda(p.monto)}</Badge>
             ))}
           </div>
+
+          <Boton variante="secundario" className="w-full" icono={<Printer className="h-4 w-4" />} onClick={reimprimir}>
+            Reimprimir ticket
+          </Boton>
 
           <div className="flex items-center justify-between text-lg font-bold">
             <span>Total</span>

@@ -11,8 +11,17 @@ import { ModalAperturaCaja } from "./modal-apertura-caja";
 import { ModalSalidaCaja } from "./modal-salida-caja";
 import { ModalProductoComun } from "./modal-producto-comun";
 import { ModalCobro } from "./modal-cobro";
+import { imprimirTicket } from "@/lib/pos/imprimir-ticket";
 import type { PosProductoT, PosDepartamentoT, ItemTicket, Ticket } from "@/lib/pos/tipos";
 import type { FormaPago } from "@/lib/pos/constantes";
+
+interface ConfigTicket {
+  nombreNegocio: string;
+  direccion: string | null;
+  telefono: string | null;
+  mensajeTicket: string;
+  simboloMoneda: string;
+}
 
 const STORAGE_KEY = "pos_tickets_v1";
 
@@ -30,12 +39,20 @@ export function PantallaVentas() {
   const [modalCobro, setModalCobro] = useState(false);
   const [procesandoCobro, setProcesandoCobro] = useState(false);
   const [versionCatalogo, setVersionCatalogo] = useState(0);
+  const [config, setConfig] = useState<ConfigTicket | null>(null);
+  const [sesionNombre, setSesionNombre] = useState("");
 
   useEffect(() => {
     cargarTurno();
     fetch("/api/pos/departamentos")
       .then((r) => r.json())
       .then((json) => { if (json.ok) setDepartamentos(json.data); });
+    fetch("/api/pos/config")
+      .then((r) => r.json())
+      .then((json) => { if (json.ok) setConfig(json.data); });
+    fetch("/api/pos/auth/me")
+      .then((r) => r.json())
+      .then((json) => { if (json.ok) setSesionNombre(json.data.nombre); });
 
     try {
       const guardado = localStorage.getItem(STORAGE_KEY);
@@ -185,6 +202,18 @@ export function PantallaVentas() {
       toast.success(`Venta #${json.data.folio} registrada`);
       setModalCobro(false);
       setVersionCatalogo((v) => v + 1);
+      if (config) {
+        imprimirTicket({
+          folio: json.data.folio,
+          fecha: json.data.fecha,
+          cajero: sesionNombre,
+          cliente: json.data.cliente?.nombre ?? null,
+          items: ticketActivo.items.map((i) => ({ descripcion: i.nombre, cantidad: i.cantidad, precioUnitario: i.precioUnitario })),
+          pagos,
+          total,
+          config,
+        });
+      }
       if (tickets.length === 1) {
         actualizarTicket(ticketActivo.id, (t) => ({ ...t, items: [], clienteId: null, clienteNombre: null }));
       } else {
