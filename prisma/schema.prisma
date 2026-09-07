@@ -377,7 +377,34 @@ model ContadorFolio {
 // ni rutas con lo anterior — todo prefijado con "Pos".
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ─── POS · SUCURSALES ─────────────────────────────────────────────────────────
+
+model PosSucursal {
+  id        String   @id @default(cuid())
+  nombre    String
+  direccion String?
+  telefono  String?
+  activa    Boolean  @default(true)
+  creadoEn  DateTime @default(now())
+
+  usuarios              PosUsuario[]
+  clientes              PosCliente[]
+  turnos                PosTurno[]
+  ventas                PosVenta[]
+  existencias           PosExistencia[]
+  movimientosInventario PosMovimientoInventario[]
+  cortesCaja            PosCorteCaja[]
+  configuracion         PosConfiguracion?
+  contadorFolio         PosContadorFolio?
+  traspasosOrigen       PosTraspaso[]             @relation("TraspasoOrigen")
+  traspasosDestino      PosTraspaso[]             @relation("TraspasoDestino")
+
+  @@index([nombre])
+}
+
 // ─── POS · USUARIOS (Cajeros y Administradores) ──────────────────────────────
+// sucursalId nulo = Administrador General: sin tienda fija, gestiona catálogo,
+// precios, traspasos entre sucursales y puede operar cualquier tienda.
 
 model PosUsuario {
   id               String    @id @default(cuid())
@@ -385,12 +412,14 @@ model PosUsuario {
   usuario          String    @unique
   contrasenaHash   String
   rol              String    @default("CAJERO") // ADMINISTRADOR | CAJERO
+  sucursalId       String?
   activo           Boolean   @default(true)
   intentosFallidos Int       @default(0)
   bloqueadoHasta   DateTime?
   creadoEn         DateTime  @default(now())
   actualizadoEn    DateTime  @updatedAt
 
+  sucursal              PosSucursal?              @relation(fields: [sucursalId], references: [id])
   sesiones              PosSesionToken[]
   turnos                PosTurno[]
   ventas                PosVenta[]
@@ -398,8 +427,10 @@ model PosUsuario {
   movimientosInventario PosMovimientoInventario[]
   devoluciones          PosDevolucion[]
   cortesCaja            PosCorteCaja[]
+  traspasos             PosTraspaso[]
 
   @@index([usuario])
+  @@index([sucursalId])
 }
 
 model PosSesionToken {
@@ -415,6 +446,10 @@ model PosSesionToken {
 }
 
 // ─── POS · CATÁLOGO ───────────────────────────────────────────────────────────
+// Producto y Departamento son compartidos por toda la cadena: el nombre y los
+// precios se definen una sola vez y se ven igual en todas las sucursales. La
+// existencia (cuántas piezas hay) es lo único que varía por tienda — vive en
+// PosExistencia.
 
 model PosDepartamento {
   id     String @id @default(cuid())
@@ -425,33 +460,74 @@ model PosDepartamento {
 }
 
 model PosProducto {
-  id               String   @id @default(cuid())
-  codigoBarras     String?  @unique
-  nombre           String
-  departamentoId   String
-  unidad           String   @default("PIEZA") // PIEZA | CAJA
-  precioCosto      Float    @default(0)
-  precioVenta      Float    @default(0)
-  precioMayoreo    Float?
-  existencia       Float    @default(0)
-  existenciaMinima Float    @default(5)
-  activo           Boolean  @default(true)
-  creadoEn         DateTime @default(now())
-  actualizadoEn    DateTime @updatedAt
+  id             String   @id @default(cuid())
+  codigoBarras   String?  @unique
+  nombre         String
+  departamentoId String
+  unidad         String   @default("PIEZA") // PIEZA | CAJA
+  precioCosto    Float    @default(0)
+  precioVenta    Float    @default(0)
+  precioMayoreo  Float?
+  activo         Boolean  @default(true)
+  creadoEn       DateTime @default(now())
+  actualizadoEn  DateTime @updatedAt
 
   departamento  PosDepartamento           @relation(fields: [departamentoId], references: [id])
+  existencias   PosExistencia[]
   detallesVenta PosDetalleVenta[]
   movimientos   PosMovimientoInventario[]
+  traspasos     PosTraspaso[]
 
   @@index([nombre])
   @@index([departamentoId])
   @@index([codigoBarras])
 }
 
+// Existencia de un producto en una sucursal específica.
+model PosExistencia {
+  id               String   @id @default(cuid())
+  sucursalId       String
+  productoId       String
+  existencia       Float    @default(0)
+  existenciaMinima Float    @default(5)
+  actualizadoEn    DateTime @updatedAt
+
+  sucursal PosSucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  producto PosProducto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  @@unique([sucursalId, productoId])
+  @@index([productoId])
+}
+
+// Traspaso de mercancía entre sucursales: solo el Administrador General puede
+// hacerlo. Resta existencia en el origen, suma en el destino y deja kardex
+// en ambas.
+model PosTraspaso {
+  id                String   @id @default(cuid())
+  productoId        String
+  sucursalOrigenId  String
+  sucursalDestinoId String
+  cantidad          Float
+  motivo            String?
+  usuarioId         String
+  creadoEn          DateTime @default(now())
+
+  producto         PosProducto @relation(fields: [productoId], references: [id])
+  sucursalOrigen   PosSucursal @relation("TraspasoOrigen", fields: [sucursalOrigenId], references: [id])
+  sucursalDestino  PosSucursal @relation("TraspasoDestino", fields: [sucursalDestinoId], references: [id])
+  usuario          PosUsuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([productoId])
+  @@index([sucursalOrigenId])
+  @@index([sucursalDestinoId])
+}
+
 // ─── POS · CLIENTES (crédito) ─────────────────────────────────────────────────
+// Cada cliente de crédito pertenece a una sola sucursal.
 
 model PosCliente {
   id            String   @id @default(cuid())
+  sucursalId    String
   nombre        String
   direccion     String?
   telefono      String?
@@ -461,9 +537,11 @@ model PosCliente {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  ventas PosVenta[]
+  sucursal PosSucursal @relation(fields: [sucursalId], references: [id])
+  ventas   PosVenta[]
 
   @@index([nombre])
+  @@index([sucursalId])
 }
 
 // ─── POS · TURNO Y CAJA ───────────────────────────────────────────────────────
@@ -471,17 +549,20 @@ model PosCliente {
 model PosTurno {
   id           String    @id @default(cuid())
   usuarioId    String
+  sucursalId   String
   fondoInicial Float     @default(0)
   abiertoEn    DateTime  @default(now())
   cerradoEn    DateTime?
   estado       String    @default("ABIERTO") // ABIERTO | CERRADO
 
   usuario     PosUsuario          @relation(fields: [usuarioId], references: [id])
+  sucursal    PosSucursal         @relation(fields: [sucursalId], references: [id])
   movimientos PosMovimientoCaja[]
   ventas      PosVenta[]
   corte       PosCorteCaja?
 
   @@index([usuarioId])
+  @@index([sucursalId])
   @@index([estado])
 }
 
@@ -507,6 +588,7 @@ model PosMovimientoCaja {
 model PosCorteCaja {
   id                    String   @id @default(cuid())
   turnoId               String   @unique
+  sucursalId            String
   fecha                 DateTime @default(now())
   fondoInicial          Float
   totalEfectivo         Float
@@ -523,18 +605,22 @@ model PosCorteCaja {
   usuarioId             String
   creadoEn              DateTime @default(now())
 
-  turno   PosTurno   @relation(fields: [turnoId], references: [id])
-  usuario PosUsuario @relation(fields: [usuarioId], references: [id])
+  turno    PosTurno    @relation(fields: [turnoId], references: [id])
+  sucursal PosSucursal @relation(fields: [sucursalId], references: [id])
+  usuario  PosUsuario  @relation(fields: [usuarioId], references: [id])
 
   @@index([fecha])
+  @@index([sucursalId])
 }
 
 // ─── POS · VENTAS ──────────────────────────────────────────────────────────────
+// El folio es consecutivo por sucursal (cada tienda numera sus tickets desde 1).
 
 model PosVenta {
   id          String    @id @default(cuid())
   folio       Int
   turnoId     String
+  sucursalId  String
   clienteId   String?
   usuarioId   String
   fecha       DateTime  @default(now())
@@ -546,6 +632,7 @@ model PosVenta {
   creadoEn    DateTime  @default(now())
 
   turno           PosTurno            @relation(fields: [turnoId], references: [id])
+  sucursal        PosSucursal         @relation(fields: [sucursalId], references: [id])
   cliente         PosCliente?         @relation(fields: [clienteId], references: [id])
   usuario         PosUsuario          @relation(fields: [usuarioId], references: [id])
   detalles        PosDetalleVenta[]
@@ -555,6 +642,7 @@ model PosVenta {
 
   @@index([folio])
   @@index([turnoId])
+  @@index([sucursalId])
   @@index([clienteId])
   @@index([fecha])
   @@index([estado])
@@ -611,7 +699,8 @@ model PosDevolucion {
 model PosMovimientoInventario {
   id                 String   @id @default(cuid())
   productoId         String
-  tipo               String // ENTRADA | SALIDA | AJUSTE | VENTA | CANCELACION | DEVOLUCION
+  sucursalId         String
+  tipo               String // ENTRADA | SALIDA | AJUSTE | VENTA | CANCELACION | DEVOLUCION | TRASPASO_ENTRADA | TRASPASO_SALIDA
   cantidad           Float
   existenciaAnterior Float
   existenciaNueva    Float
@@ -621,17 +710,21 @@ model PosMovimientoInventario {
   creadoEn           DateTime @default(now())
 
   producto PosProducto @relation(fields: [productoId], references: [id])
+  sucursal PosSucursal @relation(fields: [sucursalId], references: [id])
   usuario  PosUsuario  @relation(fields: [usuarioId], references: [id])
 
   @@index([productoId])
+  @@index([sucursalId])
   @@index([creadoEn])
   @@index([tipo])
 }
 
 // ─── POS · CONFIGURACIÓN ───────────────────────────────────────────────────────
+// Cada sucursal tiene su propia configuración (nombre en el ticket, dirección,
+// impresora, etc).
 
 model PosConfiguracion {
-  id            String   @id @default("principal")
+  sucursalId    String   @id
   nombreNegocio String   @default("Vinos y Licores")
   direccion     String?
   telefono      String?
@@ -642,9 +735,13 @@ model PosConfiguracion {
   moneda        String   @default("MXN")
   simboloMoneda String   @default("$")
   actualizadoEn DateTime @updatedAt
+
+  sucursal PosSucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
 }
 
 model PosContadorFolio {
-  id     String @id @default("ventas")
-  ultimo Int    @default(0)
+  sucursalId String @id
+  ultimo     Int    @default(0)
+
+  sucursal PosSucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
 }

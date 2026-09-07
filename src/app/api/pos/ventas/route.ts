@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requerirSesionPos } from "@/lib/pos/auth";
+import { requerirSesionPos, requerirSucursalActiva, puedeOperarTurno } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 import { registrarMovimientoInventario } from "@/lib/pos/kardex";
 import { siguienteFolioVenta } from "@/lib/pos/folio";
@@ -23,7 +23,8 @@ const TOLERANCIA = 0.01;
 
 export async function GET(req: NextRequest) {
   try {
-    await requerirSesionPos();
+    const sesion = await requerirSesionPos();
+    const sucursalId = await requerirSucursalActiva(sesion);
     const { searchParams } = new URL(req.url);
     const desde = searchParams.get("desde");
     const hasta = searchParams.get("hasta");
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
 
     const ventas = await prisma.posVenta.findMany({
       where: {
+        sucursalId,
         ...(turnoId ? { turnoId } : {}),
         ...(estado ? { estado } : {}),
         ...(desde || hasta
@@ -94,22 +96,25 @@ export async function POST(req: NextRequest) {
     const venta = await prisma.$transaction(async (tx) => {
       const turno = await tx.posTurno.findUnique({ where: { id: turnoId } });
       if (!turno || turno.estado !== "ABIERTO") throw new Error("CAJA_CERRADA");
-      if (turno.usuarioId !== sesion.id && sesion.rol !== "ADMINISTRADOR") throw new Error("SIN_PERMISO");
+      if (!puedeOperarTurno(sesion, turno)) throw new Error("SIN_PERMISO");
+      const sucursalId = turno.sucursalId;
 
       let cliente = null;
       if (montoCredito > 0 && clienteId) {
         cliente = await tx.posCliente.findUniqueOrThrow({ where: { id: clienteId } });
+        if (cliente.sucursalId !== sucursalId) throw new Error("SIN_PERMISO");
         const nuevoSaldo = cliente.saldoActual + montoCredito;
         if (nuevoSaldo > cliente.limiteCredito) throw new Error("LIMITE_CREDITO");
         await tx.posCliente.update({ where: { id: clienteId }, data: { saldoActual: nuevoSaldo } });
       }
 
-      const folio = await siguienteFolioVenta(tx);
+      const folio = await siguienteFolioVenta(tx, sucursalId);
 
       const nuevaVenta = await tx.posVenta.create({
         data: {
           folio,
           turnoId,
+          sucursalId,
           clienteId: clienteId || null,
           usuarioId: sesion.id,
           subtotal: totalTicket,
@@ -122,12 +127,14 @@ export async function POST(req: NextRequest) {
         let costoUnitario = 0;
         if (item.productoId) {
           const producto = await tx.posProducto.findUniqueOrThrow({ where: { id: item.productoId } });
-          if (producto.existencia < item.cantidad) {
+          const existencia = await tx.posExistencia.findUnique({ where: { sucursalId_productoId: { sucursalId, productoId: item.productoId } } });
+          if ((existencia?.existencia ?? 0) < item.cantidad) {
             throw new Error(`STOCK_INSUFICIENTE:${producto.nombre}`);
           }
           costoUnitario = producto.precioCosto;
           await registrarMovimientoInventario(tx, {
             productoId: item.productoId,
+            sucursalId,
             tipo: "VENTA",
             delta: -item.cantidad,
             detalle: `Venta #${folio}`,

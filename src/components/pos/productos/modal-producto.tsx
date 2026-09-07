@@ -48,8 +48,7 @@ export function ModalProducto({
       precioCosto: form.precioCosto,
       precioVenta: form.precioVenta,
       precioMayoreo: form.precioMayoreo || null,
-      existenciaMinima: form.existenciaMinima,
-      ...(producto ? {} : { existencia: form.existencia }),
+      ...(producto ? {} : { existencia: form.existencia, existenciaMinima: form.existenciaMinima }),
     };
 
     try {
@@ -88,15 +87,12 @@ export function ModalProducto({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Select
-            label="Unidad"
-            value={form.unidad}
-            onChange={(e) => set("unidad", e.target.value as "PIEZA" | "CAJA")}
-            opciones={[{ valor: "PIEZA", etiqueta: "Pieza" }, { valor: "CAJA", etiqueta: "Caja" }]}
-          />
-          <Campo label="Existencia mínima" type="number" min={0} value={form.existenciaMinima} onChange={(e) => set("existenciaMinima", e.target.value)} />
-        </div>
+        <Select
+          label="Unidad"
+          value={form.unidad}
+          onChange={(e) => set("unidad", e.target.value as "PIEZA" | "CAJA")}
+          opciones={[{ valor: "PIEZA", etiqueta: "Pieza" }, { valor: "CAJA", etiqueta: "Caja" }]}
+        />
 
         <div className="grid grid-cols-3 gap-3">
           <Campo label="Precio costo" type="number" min={0} step="0.01" required value={form.precioCosto} onChange={(e) => set("precioCosto", e.target.value)} />
@@ -105,7 +101,28 @@ export function ModalProducto({
         </div>
 
         {!producto && (
-          <Campo label="Existencia inicial" type="number" min={0} value={form.existencia} onChange={(e) => set("existencia", e.target.value)} placeholder="0" />
+          <div className="grid grid-cols-2 gap-3">
+            <Campo
+              label="Existencia inicial (en tu sucursal activa)"
+              type="number"
+              min={0}
+              value={form.existencia}
+              onChange={(e) => set("existencia", e.target.value)}
+              placeholder="0"
+            />
+            <Campo
+              label="Existencia mínima (en tu sucursal activa)"
+              type="number"
+              min={0}
+              value={form.existenciaMinima}
+              onChange={(e) => set("existenciaMinima", e.target.value)}
+            />
+          </div>
+        )}
+        {producto && (
+          <p className="text-xs text-texto-muy-suave">
+            Para ajustar existencia o existencia mínima por sucursal usa el botón de movimiento de inventario.
+          </p>
         )}
 
         {error && <p className="text-sm text-peligro">{error}</p>}

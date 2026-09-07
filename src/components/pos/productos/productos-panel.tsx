@@ -13,7 +13,15 @@ import { ModalMovimiento } from "./modal-movimiento";
 import { ModalImportar } from "./modal-importar";
 import type { PosProductoT, PosDepartamentoT } from "@/lib/pos/tipos";
 
-export function ProductosPanel({ esAdmin }: { esAdmin: boolean }) {
+export function ProductosPanel({
+  puedeEditarCatalogo,
+  puedeAjustarInventario,
+}: {
+  /** Nombre, precios, alta/baja del producto: solo el Administrador General (catálogo único de la cadena). */
+  puedeEditarCatalogo: boolean;
+  /** Entradas/salidas/ajustes de existencia en la sucursal activa: cualquier administrador. */
+  puedeAjustarInventario: boolean;
+}) {
   const [productos, setProductos] = useState<PosProductoT[]>([]);
   const [departamentos, setDepartamentos] = useState<PosDepartamentoT[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -55,9 +63,9 @@ export function ProductosPanel({ esAdmin }: { esAdmin: boolean }) {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
         <h1 className="text-xl font-bold text-texto">Catálogo de productos</h1>
-        {esAdmin && (
+        {puedeEditarCatalogo && (
           <div className="flex gap-2">
             <Boton variante="secundario" icono={<Upload className="h-4 w-4" />} onClick={() => setModalImportar(true)}>
               Importar
@@ -68,6 +76,9 @@ export function ProductosPanel({ esAdmin }: { esAdmin: boolean }) {
           </div>
         )}
       </div>
+      <p className="text-xs text-texto-muy-suave mb-5">
+        Nombre, precios y alta de productos son compartidos por toda la cadena. La existencia mostrada es la de tu sucursal activa.
+      </p>
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="relative flex-1 min-w-[220px]">
@@ -105,7 +116,7 @@ export function ProductosPanel({ esAdmin }: { esAdmin: boolean }) {
                 <th className="p-3 font-medium text-right">Venta</th>
                 <th className="p-3 font-medium text-right">Mayoreo</th>
                 <th className="p-3 font-medium text-right">Existencia</th>
-                {esAdmin && <th className="p-3 font-medium text-right">Acciones</th>}
+                {(puedeEditarCatalogo || puedeAjustarInventario) && <th className="p-3 font-medium text-right">Acciones</th>}
               </tr>
             </thead>
             <tbody>
@@ -122,18 +133,24 @@ export function ProductosPanel({ esAdmin }: { esAdmin: boolean }) {
                   <td className="p-3 text-right">
                     <Badge variante={p.existencia <= p.existenciaMinima ? "peligro" : "exito"}>{p.existencia}</Badge>
                   </td>
-                  {esAdmin && (
+                  {(puedeEditarCatalogo || puedeAjustarInventario) && (
                     <td className="p-3">
                       <div className="flex justify-end gap-1">
-                        <button onClick={() => setModalMovimiento(p)} className="p-1.5 rounded-lg hover:bg-surface-hover text-texto-suave" title="Movimiento de inventario">
-                          <ArrowLeftRight className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => setModalEdicion({ producto: p })} className="p-1.5 rounded-lg hover:bg-surface-hover text-texto-suave" title="Editar">
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => eliminar(p)} className="p-1.5 rounded-lg hover:bg-red-50 text-texto-suave hover:text-peligro" title="Dar de baja">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {puedeAjustarInventario && (
+                          <button onClick={() => setModalMovimiento(p)} className="p-1.5 rounded-lg hover:bg-surface-hover text-texto-suave" title="Movimiento de inventario">
+                            <ArrowLeftRight className="h-4 w-4" />
+                          </button>
+                        )}
+                        {puedeEditarCatalogo && (
+                          <>
+                            <button onClick={() => setModalEdicion({ producto: p })} className="p-1.5 rounded-lg hover:bg-surface-hover text-texto-suave" title="Editar">
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => eliminar(p)} className="p-1.5 rounded-lg hover:bg-red-50 text-texto-suave hover:text-peligro" title="Dar de baja">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   )}

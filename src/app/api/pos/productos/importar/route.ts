@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
-import { requerirAdminPos } from "@/lib/pos/auth";
+import { requerirAdminGeneral, obtenerSucursalActiva } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 import { registrarMovimientoInventario } from "@/lib/pos/kardex";
 
@@ -55,7 +55,11 @@ function normalizarFila(fila: Record<string, unknown>): FilaImportada {
 
 export async function POST(req: NextRequest) {
   try {
-    const sesion = await requerirAdminPos();
+    const sesion = await requerirAdminGeneral();
+    const sucursalId = await obtenerSucursalActiva(sesion);
+    if (!sucursalId) {
+      return NextResponse.json({ ok: false, error: "No hay ninguna sucursal creada todavía" }, { status: 409 });
+    }
 
     const formData = await req.formData();
     const archivo = formData.get("archivo") as File | null;
@@ -115,55 +119,41 @@ export async function POST(req: NextRequest) {
             ? await tx.posProducto.findUnique({ where: { codigoBarras } })
             : await tx.posProducto.findFirst({ where: { nombre } });
 
+          const productoId = existente
+            ? existente.id
+            : (
+                await tx.posProducto.create({
+                  data: { nombre, codigoBarras, departamentoId: departamento.id, unidad, precioCosto, precioVenta, precioMayoreo },
+                })
+              ).id;
+
           if (existente) {
             await tx.posProducto.update({
               where: { id: existente.id },
-              data: {
-                nombre,
-                departamentoId: departamento.id,
-                unidad,
-                precioCosto,
-                precioVenta,
-                precioMayoreo,
-                existenciaMinima,
-              },
+              data: { nombre, departamentoId: departamento.id, unidad, precioCosto, precioVenta, precioMayoreo },
             });
-            const delta = existencia - existente.existencia;
-            if (delta !== 0) {
-              await registrarMovimientoInventario(tx, {
-                productoId: existente.id,
-                tipo: "AJUSTE",
-                delta,
-                detalle: "Ajuste por importación masiva de catálogo",
-                usuarioId: sesion.id,
-              });
-            }
-            actualizados++;
-          } else {
-            const creado = await tx.posProducto.create({
-              data: {
-                nombre,
-                codigoBarras,
-                departamentoId: departamento.id,
-                unidad,
-                precioCosto,
-                precioVenta,
-                precioMayoreo,
-                existencia: 0,
-                existenciaMinima,
-              },
-            });
-            if (existencia > 0) {
-              await registrarMovimientoInventario(tx, {
-                productoId: creado.id,
-                tipo: "ENTRADA",
-                delta: existencia,
-                detalle: "Existencia inicial por importación masiva de catálogo",
-                usuarioId: sesion.id,
-              });
-            }
-            creados++;
           }
+
+          const existenciaActual = await tx.posExistencia.upsert({
+            where: { sucursalId_productoId: { sucursalId, productoId } },
+            update: { existenciaMinima },
+            create: { sucursalId, productoId, existenciaMinima },
+          });
+
+          const delta = existencia - existenciaActual.existencia;
+          if (delta !== 0) {
+            await registrarMovimientoInventario(tx, {
+              productoId,
+              sucursalId,
+              tipo: existente ? "AJUSTE" : "ENTRADA",
+              delta,
+              detalle: existente ? "Ajuste por importación masiva de catálogo" : "Existencia inicial por importación masiva de catálogo",
+              usuarioId: sesion.id,
+            });
+          }
+
+          if (existente) actualizados++;
+          else creados++;
         });
       } catch {
         errores.push(`Fila ${i + 2}: no se pudo guardar "${nombre}"`);

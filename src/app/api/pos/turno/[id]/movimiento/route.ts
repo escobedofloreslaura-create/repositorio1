@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requerirSesionPos } from "@/lib/pos/auth";
+import { requerirSesionPos, puedeOperarTurno } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 
 const TIPOS_PERMITIDOS = ["SALIDA", "PAGO_PROVEEDOR", "ENTRADA_MANUAL"];
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!turno || turno.estado !== "ABIERTO") {
       return NextResponse.json({ ok: false, error: "La caja no está abierta" }, { status: 409 });
     }
-    if (turno.usuarioId !== sesion.id && sesion.rol !== "ADMINISTRADOR") {
+    if (!puedeOperarTurno(sesion, turno)) {
       return NextResponse.json({ ok: false, error: "No puedes registrar movimientos en la caja de otro cajero" }, { status: 403 });
     }
 

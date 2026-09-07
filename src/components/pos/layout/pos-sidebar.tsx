@@ -3,19 +3,22 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ShoppingCart, Package, Users, History, Landmark, ClipboardList,
-  UserCog, Settings, LogOut, Wine, Menu, X,
+  UserCog, Settings, LogOut, Wine, Menu, X, Store, ArrowLeftRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import type { SesionPos } from "@/lib/pos/auth";
+import { SucursalSwitcher } from "./sucursal-switcher";
 
-const MENU: { href: string; icono: React.ElementType; etiqueta: string; soloAdmin?: boolean }[] = [
+const MENU: { href: string; icono: React.ElementType; etiqueta: string; soloAdmin?: boolean; soloAdminGeneral?: boolean }[] = [
   { href: "/pos", icono: ShoppingCart, etiqueta: "Ventas" },
   { href: "/pos/productos", icono: Package, etiqueta: "Productos" },
   { href: "/pos/clientes", icono: Users, etiqueta: "Clientes" },
   { href: "/pos/historico", icono: History, etiqueta: "Histórico" },
   { href: "/pos/corte", icono: Landmark, etiqueta: "Corte de caja" },
   { href: "/pos/inventario", icono: ClipboardList, etiqueta: "Inventario" },
+  { href: "/pos/traspasos", icono: ArrowLeftRight, etiqueta: "Traspasos", soloAdminGeneral: true },
+  { href: "/pos/sucursales", icono: Store, etiqueta: "Sucursales", soloAdminGeneral: true },
   { href: "/pos/usuarios", icono: UserCog, etiqueta: "Usuarios", soloAdmin: true },
   { href: "/pos/configuracion", icono: Settings, etiqueta: "Configuración", soloAdmin: true },
 ];
@@ -42,7 +45,12 @@ function ItemMenu({ href, icono: Icono, etiqueta, onClick }: { href: string; ico
 export function PosSidebar({ sesion }: { sesion: SesionPos }) {
   const router = useRouter();
   const [movilAbierto, setMovilAbierto] = useState(false);
-  const items = MENU.filter((m) => !m.soloAdmin || sesion.rol === "ADMINISTRADOR");
+  const esAdminGeneral = sesion.rol === "ADMINISTRADOR" && sesion.sucursalId === null;
+  const items = MENU.filter((m) => {
+    if (m.soloAdminGeneral) return esAdminGeneral;
+    if (m.soloAdmin) return sesion.rol === "ADMINISTRADOR";
+    return true;
+  });
 
   async function cerrarSesion() {
     await fetch("/api/pos/auth/logout", { method: "POST" });
@@ -63,6 +71,12 @@ export function PosSidebar({ sesion }: { sesion: SesionPos }) {
           </div>
         </div>
       </div>
+
+      {esAdminGeneral && (
+        <div className="px-3 pt-3">
+          <SucursalSwitcher />
+        </div>
+      )}
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
         {items.map((item) => (

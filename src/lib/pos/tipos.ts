@@ -4,6 +4,14 @@ export interface PosDepartamentoT {
   orden: number;
 }
 
+export interface PosSucursalT {
+  id: string;
+  nombre: string;
+  direccion: string | null;
+  telefono: string | null;
+  activa: boolean;
+}
+
 export interface PosProductoT {
   id: string;
   codigoBarras: string | null;
@@ -16,6 +24,7 @@ export interface PosProductoT {
   precioMayoreo: number | null;
   existencia: number;
   existenciaMinima: number;
+  existenciasPorSucursal?: { sucursalId: string; sucursalNombre: string; existencia: number }[];
   activo: boolean;
 }
 

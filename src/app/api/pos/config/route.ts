@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requerirSesionPos, requerirAdminPos } from "@/lib/pos/auth";
+import { requerirSesionPos, requerirAdminPos, requerirSucursalActiva } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 
 export async function GET() {
   try {
-    await requerirSesionPos();
+    const sesion = await requerirSesionPos();
+    const sucursalId = await requerirSucursalActiva(sesion);
     const config = await prisma.posConfiguracion.upsert({
-      where: { id: "principal" },
+      where: { sucursalId },
       update: {},
-      create: { id: "principal" },
+      create: { sucursalId },
     });
     return NextResponse.json({ ok: true, data: config });
   } catch (e) {
@@ -19,12 +20,13 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
-    await requerirAdminPos();
+    const sesion = await requerirAdminPos();
+    const sucursalId = await requerirSucursalActiva(sesion);
     const body = await req.json();
     const { nombreNegocio, direccion, telefono, rfc, mensajeTicket, impresora, moneda, simboloMoneda } = body;
 
     const config = await prisma.posConfiguracion.upsert({
-      where: { id: "principal" },
+      where: { sucursalId },
       update: {
         ...(nombreNegocio !== undefined ? { nombreNegocio } : {}),
         ...(direccion !== undefined ? { direccion } : {}),
@@ -35,7 +37,7 @@ export async function PUT(req: NextRequest) {
         ...(moneda !== undefined ? { moneda } : {}),
         ...(simboloMoneda !== undefined ? { simboloMoneda } : {}),
       },
-      create: { id: "principal", nombreNegocio, direccion, telefono, rfc, mensajeTicket, impresora, moneda, simboloMoneda },
+      create: { sucursalId, nombreNegocio, direccion, telefono, rfc, mensajeTicket, impresora, moneda, simboloMoneda },
     });
 
     return NextResponse.json({ ok: true, data: config });

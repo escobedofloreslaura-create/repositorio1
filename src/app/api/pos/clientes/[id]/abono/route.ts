@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requerirSesionPos } from "@/lib/pos/auth";
+import { requerirSesionPos, puedeOperarTurno } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 import { TIPO_COBRO_CLIENTE_POR_FORMA, type FormaAbono } from "@/lib/pos/constantes";
 
@@ -29,7 +29,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const cliente = await tx.posCliente.findUniqueOrThrow({ where: { id } });
       const turno = await tx.posTurno.findUnique({ where: { id: turnoId } });
       if (!turno || turno.estado !== "ABIERTO") throw new Error("CAJA_CERRADA");
-      if (turno.usuarioId !== sesion.id && sesion.rol !== "ADMINISTRADOR") throw new Error("SIN_PERMISO");
+      if (!puedeOperarTurno(sesion, turno)) throw new Error("SIN_PERMISO");
+      if (cliente.sucursalId !== turno.sucursalId) throw new Error("SIN_PERMISO");
 
       await tx.posCliente.update({
         where: { id },

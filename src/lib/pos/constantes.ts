@@ -59,4 +59,8 @@ export const TIPOS_MOVIMIENTO_INVENTARIO = [
   "VENTA",
   "CANCELACION",
   "DEVOLUCION",
+  "TRASPASO_ENTRADA",
+  "TRASPASO_SALIDA",
 ] as const;
+
+export const LIMITE_ADMIN_GENERAL = 2;

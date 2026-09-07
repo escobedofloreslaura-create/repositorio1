@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requerirSesionPos } from "@/lib/pos/auth";
+import { requerirSesionPos, puedeOperarTurno } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 
 function sumaPorTipo(movimientos: { tipo: string; monto: number }[], tipo: string): number {
@@ -18,7 +18,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       const turno = await tx.posTurno.findUnique({ where: { id }, include: { movimientos: true } });
       if (!turno) throw new Error("NO_ENCONTRADA");
       if (turno.estado !== "ABIERTO") throw new Error("YA_CERRADO");
-      if (turno.usuarioId !== sesion.id && sesion.rol !== "ADMINISTRADOR") throw new Error("SIN_PERMISO");
+      if (!puedeOperarTurno(sesion, turno)) throw new Error("SIN_PERMISO");
 
       const ventas = await tx.posVenta.findMany({
         where: { turnoId: id, estado: "COMPLETADA" },
@@ -61,6 +61,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       const nuevoCorte = await tx.posCorteCaja.create({
         data: {
           turnoId: id,
+          sucursalId: turno.sucursalId,
           fondoInicial: turno.fondoInicial,
           totalEfectivo,
           totalTarjeta,
