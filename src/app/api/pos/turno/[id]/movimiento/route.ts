@@ -27,6 +27,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!turno || turno.estado !== "ABIERTO") {
       return NextResponse.json({ ok: false, error: "La caja no está abierta" }, { status: 409 });
     }
+    if (turno.usuarioId !== sesion.id && sesion.rol !== "ADMINISTRADOR") {
+      return NextResponse.json({ ok: false, error: "No puedes registrar movimientos en la caja de otro cajero" }, { status: 403 });
+    }
 
     const movimiento = await prisma.posMovimientoCaja.create({
       data: {

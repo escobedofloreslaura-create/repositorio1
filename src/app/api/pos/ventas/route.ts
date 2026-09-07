@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
     const venta = await prisma.$transaction(async (tx) => {
       const turno = await tx.posTurno.findUnique({ where: { id: turnoId } });
       if (!turno || turno.estado !== "ABIERTO") throw new Error("CAJA_CERRADA");
+      if (turno.usuarioId !== sesion.id && sesion.rol !== "ADMINISTRADOR") throw new Error("SIN_PERMISO");
 
       let cliente = null;
       if (montoCredito > 0 && clienteId) {
@@ -181,6 +182,9 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     if (e instanceof Error && e.message === "CAJA_CERRADA") {
       return NextResponse.json({ ok: false, error: "La caja de este turno ya está cerrada" }, { status: 409 });
+    }
+    if (e instanceof Error && e.message === "SIN_PERMISO") {
+      return NextResponse.json({ ok: false, error: "No puedes vender en la caja de otro cajero" }, { status: 403 });
     }
     if (e instanceof Error && e.message === "LIMITE_CREDITO") {
       return NextResponse.json({ ok: false, error: "El cliente excede su límite de crédito" }, { status: 409 });
