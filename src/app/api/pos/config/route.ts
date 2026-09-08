@@ -23,7 +23,7 @@ export async function PUT(req: NextRequest) {
     const sesion = await requerirAdminPos();
     const sucursalId = await requerirSucursalActiva(sesion);
     const body = await req.json();
-    const { nombreNegocio, direccion, telefono, rfc, mensajeTicket, impresora, moneda, simboloMoneda } = body;
+    const { nombreNegocio, direccion, telefono, rfc, mensajeTicket, logoUrl, impresora, moneda, simboloMoneda } = body;
 
     const config = await prisma.posConfiguracion.upsert({
       where: { sucursalId },
@@ -33,11 +33,12 @@ export async function PUT(req: NextRequest) {
         ...(telefono !== undefined ? { telefono } : {}),
         ...(rfc !== undefined ? { rfc } : {}),
         ...(mensajeTicket !== undefined ? { mensajeTicket } : {}),
+        ...(logoUrl !== undefined ? { logoUrl } : {}),
         ...(impresora !== undefined ? { impresora } : {}),
         ...(moneda !== undefined ? { moneda } : {}),
         ...(simboloMoneda !== undefined ? { simboloMoneda } : {}),
       },
-      create: { sucursalId, nombreNegocio, direccion, telefono, rfc, mensajeTicket, impresora, moneda, simboloMoneda },
+      create: { sucursalId, nombreNegocio, direccion, telefono, rfc, mensajeTicket, logoUrl, impresora, moneda, simboloMoneda },
     });
 
     return NextResponse.json({ ok: true, data: config });

@@ -20,6 +20,7 @@ interface ConfigTicket {
   direccion: string | null;
   telefono: string | null;
   mensajeTicket: string;
+  logoUrl: string | null;
   simboloMoneda: string;
   impresora: string | null;
 }

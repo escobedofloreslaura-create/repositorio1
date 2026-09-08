@@ -1,5 +1,10 @@
+import { useState } from "react";
+import { Printer } from "lucide-react";
 import { Tarjeta } from "@/components/ui/tarjeta";
+import { Boton } from "@/components/ui/boton";
 import { formatearMoneda } from "@/lib/formato";
+import { imprimirCorteAutomatico } from "@/lib/pos/imprimir-corte";
+import toast from "react-hot-toast";
 import type { PosCorteT } from "@/lib/pos/tipos";
 
 type ClaveMonto = "fondoInicial" | "totalEfectivo" | "totalTarjeta" | "totalTransferencia" | "totalCobroClientes" | "totalEntradasManuales" | "totalPagoProveedores" | "totalSalidas";
@@ -16,8 +21,47 @@ const FILAS: { clave: ClaveMonto; etiqueta: string }[] = [
 ];
 
 export function ResumenCorte({ corte }: { corte: PosCorteT }) {
+  const [imprimiendo, setImprimiendo] = useState(false);
+
+  async function imprimir() {
+    setImprimiendo(true);
+    try {
+      const res = await fetch("/api/pos/config");
+      const json = await res.json();
+      if (!json.ok) return toast.error("No se pudo obtener la configuración del negocio");
+      const config = json.data;
+      const via = await imprimirCorteAutomatico(
+        {
+          fecha: corte.fecha,
+          cerradoPor: corte.usuario.nombre,
+          fondoInicial: corte.fondoInicial,
+          totalEfectivo: corte.totalEfectivo,
+          totalTarjeta: corte.totalTarjeta,
+          totalTransferencia: corte.totalTransferencia,
+          totalCobroClientes: corte.totalCobroClientes,
+          totalEntradasManuales: corte.totalEntradasManuales,
+          totalPagoProveedores: corte.totalPagoProveedores,
+          totalSalidas: corte.totalSalidas,
+          ventasTotales: corte.ventasTotales,
+          gananciaReal: corte.gananciaReal,
+          efectivoEsperado: corte.efectivoEsperado,
+          config,
+        },
+        config.impresora
+      );
+      if (via === "navegador" && config.impresora) {
+        toast("No se pudo conectar con QZ Tray, se abrió el diálogo de impresión.", { icon: "⚠️" });
+      }
+    } finally {
+      setImprimiendo(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
+      <Boton variante="secundario" icono={<Printer className="h-4 w-4" />} cargando={imprimiendo} onClick={imprimir}>
+        Imprimir corte
+      </Boton>
       <div className="rounded-xl border border-borde divide-y divide-borde">
         {FILAS.map((f) => (
           <div key={f.clave} className="flex justify-between px-4 py-2.5 text-sm">

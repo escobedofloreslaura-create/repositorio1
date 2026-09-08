@@ -1,82 +1,71 @@
 import { formatearMoneda, formatearFechaHumana } from "@/lib/formato";
-import { ETIQUETAS_FORMA_PAGO, type FormaPago } from "@/lib/pos/constantes";
 import { escpos, qzImprimirRaw } from "@/lib/pos/qz";
 
-interface ItemTicketImprimir {
-  descripcion: string;
-  cantidad: number;
-  precioUnitario: number;
-}
-
-interface PagoTicketImprimir {
-  forma: FormaPago;
-  monto: number;
-}
-
-interface ConfigTicket {
+interface ConfigCorte {
   nombreNegocio: string;
   direccion?: string | null;
   telefono?: string | null;
-  mensajeTicket: string;
   logoUrl?: string | null;
   simboloMoneda: string;
 }
 
-export interface DatosTicket {
-  folio: number;
+export interface DatosCorte {
   fecha: string | Date;
-  cajero: string;
-  cliente?: string | null;
-  items: ItemTicketImprimir[];
-  pagos: PagoTicketImprimir[];
-  total: number;
-  config: ConfigTicket;
+  cerradoPor: string;
+  fondoInicial: number;
+  totalEfectivo: number;
+  totalTarjeta: number;
+  totalTransferencia: number;
+  totalCobroClientes: number;
+  totalEntradasManuales: number;
+  totalPagoProveedores: number;
+  totalSalidas: number;
+  ventasTotales: number;
+  gananciaReal: number;
+  efectivoEsperado: number;
+  config: ConfigCorte;
 }
 
 function escaparHtml(texto: string): string {
   return texto.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
 
-export function imprimirTicket(params: DatosTicket) {
-  const { folio, fecha, cajero, cliente, items, pagos, total, config } = params;
+const FILAS_CORTE: { clave: keyof DatosCorte; etiqueta: string }[] = [
+  { clave: "fondoInicial", etiqueta: "Fondo inicial" },
+  { clave: "totalEfectivo", etiqueta: "Ventas de contado (efectivo)" },
+  { clave: "totalTarjeta", etiqueta: "Ventas con tarjeta" },
+  { clave: "totalTransferencia", etiqueta: "Ventas por transferencia" },
+  { clave: "totalCobroClientes", etiqueta: "Cobro a clientes" },
+  { clave: "totalEntradasManuales", etiqueta: "Entradas de efectivo" },
+  { clave: "totalPagoProveedores", etiqueta: "Pagos a proveedores" },
+  { clave: "totalSalidas", etiqueta: "Salidas de dinero" },
+];
+
+export function imprimirCorte(params: DatosCorte) {
+  const { fecha, cerradoPor, ventasTotales, gananciaReal, efectivoEsperado, config } = params;
   const moneda = (m: number) => formatearMoneda(m, config.simboloMoneda);
 
-  const filasItems = items
-    .map(
-      (i) => `
-        <tr>
-          <td colspan="3" class="nombre">${escaparHtml(i.descripcion)}</td>
-        </tr>
-        <tr>
-          <td>${i.cantidad} x ${moneda(i.precioUnitario)}</td>
-          <td></td>
-          <td class="derecha">${moneda(i.cantidad * i.precioUnitario)}</td>
-        </tr>`
-    )
-    .join("");
-
-  const filasPagos = pagos
-    .map((p) => `<tr><td>${ETIQUETAS_FORMA_PAGO[p.forma]}</td><td></td><td class="derecha">${moneda(p.monto)}</td></tr>`)
-    .join("");
+  const filas = FILAS_CORTE.map(
+    (f) => `<tr><td>${f.etiqueta}</td><td class="derecha">${moneda(params[f.clave] as number)}</td></tr>`
+  ).join("");
 
   const html = `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8" />
-<title>Ticket #${folio}</title>
+<title>Corte de caja</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: "Courier New", monospace; width: 300px; margin: 0 auto; padding: 12px; color: #000; font-size: 13px; }
   h1 { font-size: 16px; text-align: center; margin: 0 0 4px; }
+  h2 { font-size: 14px; text-align: center; margin: 4px 0; }
   .centro { text-align: center; }
   .logo { display: block; max-width: 160px; max-height: 100px; margin: 0 auto 6px; }
   .linea { border-top: 1px dashed #000; margin: 8px 0; }
   table { width: 100%; border-collapse: collapse; }
   td { padding: 2px 0; vertical-align: top; }
-  td.nombre { padding-top: 6px; font-weight: bold; }
   td.derecha { text-align: right; white-space: nowrap; }
-  .total { font-size: 15px; font-weight: bold; }
-  .pie { text-align: center; margin-top: 10px; font-size: 12px; }
+  .total { font-size: 14px; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -85,17 +74,19 @@ export function imprimirTicket(params: DatosTicket) {
   ${config.direccion ? `<p class="centro">${escaparHtml(config.direccion)}</p>` : ""}
   ${config.telefono ? `<p class="centro">Tel: ${escaparHtml(config.telefono)}</p>` : ""}
   <div class="linea"></div>
-  <p>Ticket: #${folio}<br/>Fecha: ${formatearFechaHumana(fecha)}<br/>Cajero: ${escaparHtml(cajero)}${cliente ? `<br/>Cliente: ${escaparHtml(cliente)}` : ""}</p>
+  <h2>Corte de caja</h2>
+  <p>Fecha: ${formatearFechaHumana(fecha)}<br/>Cerrado por: ${escaparHtml(cerradoPor)}</p>
   <div class="linea"></div>
-  <table>${filasItems}</table>
+  <table>${filas}</table>
   <div class="linea"></div>
   <table>
-    <tr class="total"><td>Total</td><td></td><td class="derecha">${moneda(total)}</td></tr>
+    <tr class="total"><td>Ventas totales</td><td class="derecha">${moneda(ventasTotales)}</td></tr>
+    <tr class="total"><td>Ganancia real</td><td class="derecha">${moneda(gananciaReal)}</td></tr>
   </table>
   <div class="linea"></div>
-  <table>${filasPagos}</table>
-  <div class="linea"></div>
-  <p class="pie">${escaparHtml(config.mensajeTicket)}</p>
+  <table>
+    <tr class="total"><td>Efectivo esperado</td><td class="derecha">${moneda(efectivoEsperado)}</td></tr>
+  </table>
   <script>window.onload = () => { window.print(); }</script>
 </body>
 </html>`;
@@ -108,8 +99,6 @@ export function imprimirTicket(params: DatosTicket) {
 }
 
 // ─── Impresión térmica silenciosa (ESC/POS vía QZ Tray) ───────────────────────
-// 32 caracteres por línea: es el ancho más chico común (papel de 58mm) por lo
-// que también cabe, con margen, en tickets de 80mm.
 const ANCHO_TICKET = 32;
 
 function envolverTexto(texto: string, ancho = ANCHO_TICKET): string[] {
@@ -134,8 +123,8 @@ function filaDosColumnas(izquierda: string, derecha: string, ancho = ANCHO_TICKE
   return izquierda + " ".repeat(espacio) + derecha + "\n";
 }
 
-export function construirComandosTicket(params: DatosTicket): string[] {
-  const { folio, fecha, cajero, cliente, items, pagos, total, config } = params;
+export function construirComandosCorte(params: DatosCorte): string[] {
+  const { fecha, cerradoPor, ventasTotales, gananciaReal, efectivoEsperado, config } = params;
   const moneda = (m: number) => formatearMoneda(m, config.simboloMoneda);
   const linea = "-".repeat(ANCHO_TICKET) + "\n";
   const cmds: string[] = [];
@@ -145,42 +134,37 @@ export function construirComandosTicket(params: DatosTicket): string[] {
   cmds.push(escpos.dobleAltoOff, escpos.negritaOff);
   if (config.direccion) envolverTexto(config.direccion).forEach((l) => cmds.push(l + "\n"));
   if (config.telefono) cmds.push(`Tel: ${config.telefono}\n`);
-  cmds.push(escpos.izquierda, linea);
-  cmds.push(`Ticket: #${folio}\n`, `Fecha: ${formatearFechaHumana(fecha)}\n`, `Cajero: ${cajero}\n`);
-  if (cliente) cmds.push(`Cliente: ${cliente}\n`);
+  cmds.push(escpos.izquierda, linea, escpos.centrar, escpos.negritaOn, "CORTE DE CAJA\n", escpos.negritaOff, escpos.izquierda);
+  cmds.push(`Fecha: ${formatearFechaHumana(fecha)}\n`, `Cerrado por: ${cerradoPor}\n`, linea);
+
+  for (const f of FILAS_CORTE) cmds.push(filaDosColumnas(f.etiqueta, moneda(params[f.clave] as number)));
+  cmds.push(linea, escpos.negritaOn);
+  cmds.push(filaDosColumnas("Ventas totales", moneda(ventasTotales)));
+  cmds.push(filaDosColumnas("Ganancia real", moneda(gananciaReal)));
   cmds.push(linea);
-
-  for (const item of items) {
-    envolverTexto(item.descripcion).forEach((l) => cmds.push(l + "\n"));
-    cmds.push(filaDosColumnas(`${item.cantidad} x ${moneda(item.precioUnitario)}`, moneda(item.cantidad * item.precioUnitario)));
-  }
-  cmds.push(linea, escpos.negritaOn, filaDosColumnas("TOTAL", moneda(total)), escpos.negritaOff, linea);
-
-  for (const pago of pagos) cmds.push(filaDosColumnas(ETIQUETAS_FORMA_PAGO[pago.forma], moneda(pago.monto)));
-  cmds.push(linea, escpos.centrar);
-  envolverTexto(config.mensajeTicket).forEach((l) => cmds.push(l + "\n"));
-  cmds.push(escpos.salto, escpos.salto, escpos.salto, escpos.cortar);
+  cmds.push(filaDosColumnas("Efectivo esperado", moneda(efectivoEsperado)));
+  cmds.push(escpos.negritaOff, escpos.salto, escpos.salto, escpos.salto, escpos.cortar);
 
   return cmds;
 }
 
 /**
  * Intenta imprimir en silencio en la impresora térmica configurada vía QZ
- * Tray (sin diálogo de impresión); si QZ Tray no está instalado/corriendo,
- * o no hay impresora configurada, cae de vuelta al diálogo del navegador.
+ * Tray (sin diálogo de impresión); si QZ Tray no está instalado/corriendo, o
+ * no hay impresora configurada, cae de vuelta al diálogo del navegador.
  */
-export async function imprimirTicketAutomatico(
-  params: DatosTicket,
+export async function imprimirCorteAutomatico(
+  params: DatosCorte,
   impresoraQz: string | null | undefined
 ): Promise<"qz" | "navegador"> {
   if (impresoraQz) {
     try {
-      await qzImprimirRaw(impresoraQz, construirComandosTicket(params));
+      await qzImprimirRaw(impresoraQz, construirComandosCorte(params));
       return "qz";
     } catch (e) {
       console.warn("No se pudo imprimir vía QZ Tray, usando el diálogo del navegador:", e);
     }
   }
-  imprimirTicket(params);
+  imprimirCorte(params);
   return "navegador";
 }
