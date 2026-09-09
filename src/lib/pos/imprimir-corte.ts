@@ -24,6 +24,8 @@ export interface DatosCorte {
   gananciaReal?: number;
   /** false para una sesión de cajero: la ganancia no se imprime, solo el importe de venta. */
   mostrarGanancia: boolean;
+  /** Ausente para una sesión de cajero, igual que la ganancia. */
+  ventasPorDepartamento?: { departamento: string; total: number }[];
   efectivoEsperado: number;
   config: ConfigCorte;
 }
@@ -44,12 +46,16 @@ const FILAS_CORTE: { clave: keyof DatosCorte; etiqueta: string }[] = [
 ];
 
 export function imprimirCorte(params: DatosCorte) {
-  const { fecha, cerradoPor, ventasTotales, gananciaReal, mostrarGanancia, efectivoEsperado, config } = params;
+  const { fecha, cerradoPor, ventasTotales, gananciaReal, mostrarGanancia, ventasPorDepartamento, efectivoEsperado, config } = params;
   const moneda = (m: number) => formatearMoneda(m, config.simboloMoneda);
 
   const filas = FILAS_CORTE.map(
     (f) => `<tr><td>${f.etiqueta}</td><td class="derecha">${moneda(params[f.clave] as number)}</td></tr>`
   ).join("");
+
+  const filasDepartamentos = (ventasPorDepartamento ?? [])
+    .map((d) => `<tr><td>${escaparHtml(d.departamento)}</td><td class="derecha">${moneda(d.total)}</td></tr>`)
+    .join("");
 
   const html = `<!doctype html>
 <html>
@@ -80,6 +86,7 @@ export function imprimirCorte(params: DatosCorte) {
   <p>Fecha: ${formatearFechaImpresion(fecha)}<br/>Cerrado por: ${escaparHtml(cerradoPor)}</p>
   <div class="linea"></div>
   <table>${filas}</table>
+  ${filasDepartamentos ? `<div class="linea"></div><p class="centro"><strong>Ventas por departamento</strong></p><table>${filasDepartamentos}</table>` : ""}
   <div class="linea"></div>
   <table>
     <tr class="total"><td>Ventas totales</td><td class="derecha">${moneda(ventasTotales)}</td></tr>
@@ -126,7 +133,7 @@ function filaDosColumnas(izquierda: string, derecha: string, ancho = ANCHO_TICKE
 }
 
 export function construirComandosCorte(params: DatosCorte): string[] {
-  const { fecha, cerradoPor, ventasTotales, gananciaReal, mostrarGanancia, efectivoEsperado, config } = params;
+  const { fecha, cerradoPor, ventasTotales, gananciaReal, mostrarGanancia, ventasPorDepartamento, efectivoEsperado, config } = params;
   const moneda = (m: number) => formatearMoneda(m, config.simboloMoneda);
   const linea = "-".repeat(ANCHO_TICKET) + "\n";
   const cmds: string[] = [];
@@ -140,6 +147,12 @@ export function construirComandosCorte(params: DatosCorte): string[] {
   cmds.push(`Fecha: ${formatearFechaImpresion(fecha)}\n`, `Cerrado por: ${cerradoPor}\n`, linea);
 
   for (const f of FILAS_CORTE) cmds.push(filaDosColumnas(f.etiqueta, moneda(params[f.clave] as number)));
+
+  if (ventasPorDepartamento && ventasPorDepartamento.length > 0) {
+    cmds.push(linea, escpos.centrar, escpos.negritaOn, "VENTAS POR DEPARTAMENTO\n", escpos.negritaOff, escpos.izquierda);
+    for (const d of ventasPorDepartamento) cmds.push(filaDosColumnas(d.departamento, moneda(d.total)));
+  }
+
   cmds.push(linea, escpos.negritaOn);
   cmds.push(filaDosColumnas("Ventas totales", moneda(ventasTotales)));
   if (mostrarGanancia && gananciaReal !== undefined) cmds.push(filaDosColumnas("Ganancia real", moneda(gananciaReal)));

@@ -22,18 +22,26 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
       const ventas = await tx.posVenta.findMany({
         where: { turnoId: id, estado: "COMPLETADA" },
-        include: { detalles: true },
+        include: { detalles: { include: { producto: { include: { departamento: true } } } } },
       });
 
       let ventasTotales = 0;
       let costoVentas = 0;
+      const ventasPorDepartamentoMapa = new Map<string, number>();
       for (const venta of ventas) {
         for (const detalle of venta.detalles) {
           const cantidadNeta = detalle.cantidad - detalle.cantidadDevuelta;
-          ventasTotales += cantidadNeta * detalle.precioUnitario;
+          const subtotalNeto = cantidadNeta * detalle.precioUnitario;
+          ventasTotales += subtotalNeto;
           costoVentas += cantidadNeta * detalle.costoUnitario;
+
+          const nombreDepartamento = detalle.producto?.departamento.nombre ?? "Otros";
+          ventasPorDepartamentoMapa.set(nombreDepartamento, (ventasPorDepartamentoMapa.get(nombreDepartamento) ?? 0) + subtotalNeto);
         }
       }
+      const ventasPorDepartamento = Array.from(ventasPorDepartamentoMapa, ([departamento, total]) => ({ departamento, total })).sort(
+        (a, b) => b.total - a.total
+      );
 
       const movimientos = turno.movimientos;
       const totalEfectivo = sumaPorTipo(movimientos, "VENTA_EFECTIVO");
@@ -80,13 +88,14 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
       await tx.posTurno.update({ where: { id }, data: { estado: "CERRADO", cerradoEn: new Date() } });
 
-      return nuevoCorte;
+      return { ...nuevoCorte, ventasPorDepartamento };
     });
 
-    // La ganancia (costo vs. venta) es información confidencial del negocio:
-    // solo los administradores la ven. Un cajero solo ve el importe de venta.
+    // La ganancia (costo vs. venta) y el desglose por departamento son
+    // información confidencial del negocio: solo los administradores la ven.
+    // Un cajero solo ve el importe total de venta.
     if (sesion.rol !== "ADMINISTRADOR") {
-      const { costoVentas: _costoVentas, gananciaReal: _gananciaReal, ...resto } = corte;
+      const { costoVentas: _costoVentas, gananciaReal: _gananciaReal, ventasPorDepartamento: _ventasPorDepartamento, ...resto } = corte;
       return NextResponse.json({ ok: true, data: resto });
     }
 

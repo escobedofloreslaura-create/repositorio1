@@ -46,6 +46,7 @@ export function ResumenCorte({ corte }: { corte: PosCorteT }) {
           ventasTotales: corte.ventasTotales,
           gananciaReal: corte.gananciaReal,
           mostrarGanancia: corte.gananciaReal !== undefined,
+          ventasPorDepartamento: corte.ventasPorDepartamento,
           efectivoEsperado: corte.efectivoEsperado,
           config,
         },
@@ -72,6 +73,20 @@ export function ResumenCorte({ corte }: { corte: PosCorteT }) {
           </div>
         ))}
       </div>
+
+      {corte.ventasPorDepartamento && corte.ventasPorDepartamento.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-texto-suave uppercase tracking-wide mb-2">Ventas por departamento</h3>
+          <div className="rounded-xl border border-borde divide-y divide-borde">
+            {corte.ventasPorDepartamento.map((d) => (
+              <div key={d.departamento} className="flex justify-between px-4 py-2.5 text-sm">
+                <span className="text-texto-suave">{d.departamento}</span>
+                <span className="font-medium text-texto">{formatearMoneda(d.total)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className={cn("grid gap-3", corte.gananciaReal !== undefined ? "grid-cols-2" : "grid-cols-1")}>
         <Tarjeta padding="md">
