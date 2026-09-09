@@ -28,6 +28,22 @@ interface UsuarioPos {
   activo: boolean;
 }
 
+function esHoy(fechaISO: string): boolean {
+  const f = new Date(fechaISO);
+  const hoy = new Date();
+  return f.getFullYear() === hoy.getFullYear() && f.getMonth() === hoy.getMonth() && f.getDate() === hoy.getDate();
+}
+
+const CAMPOS_RESUMEN_DIA = [
+  { clave: "totalEfectivo", etiqueta: "Ventas de contado (efectivo)" },
+  { clave: "totalTarjeta", etiqueta: "Ventas con tarjeta" },
+  { clave: "totalTransferencia", etiqueta: "Ventas por transferencia" },
+  { clave: "totalCobroClientes", etiqueta: "Cobro a clientes" },
+  { clave: "totalEntradasManuales", etiqueta: "Entradas de efectivo" },
+  { clave: "totalPagoProveedores", etiqueta: "Pagos a proveedores" },
+  { clave: "totalSalidas", etiqueta: "Salidas de dinero" },
+] as const;
+
 export function CortePanel({ esAdmin }: { esAdmin: boolean }) {
   const [turno, setTurno] = useState<TurnoActual | null | undefined>(undefined);
   const [cortes, setCortes] = useState<PosCorteT[]>([]);
@@ -52,6 +68,25 @@ export function CortePanel({ esAdmin }: { esAdmin: boolean }) {
   }
 
   useEffect(() => { cargarTurno(); cargarCortes(); }, []);
+
+  const cortesHoy = cortes.filter((c) => esHoy(c.fecha));
+  const resumenHoy = cortesHoy.reduce(
+    (acc, c) => ({
+      totalEfectivo: acc.totalEfectivo + c.totalEfectivo,
+      totalTarjeta: acc.totalTarjeta + c.totalTarjeta,
+      totalTransferencia: acc.totalTransferencia + c.totalTransferencia,
+      totalCobroClientes: acc.totalCobroClientes + c.totalCobroClientes,
+      totalEntradasManuales: acc.totalEntradasManuales + c.totalEntradasManuales,
+      totalPagoProveedores: acc.totalPagoProveedores + c.totalPagoProveedores,
+      totalSalidas: acc.totalSalidas + c.totalSalidas,
+      ventasTotales: acc.ventasTotales + c.ventasTotales,
+      gananciaReal: acc.gananciaReal + (c.gananciaReal ?? 0),
+    }),
+    {
+      totalEfectivo: 0, totalTarjeta: 0, totalTransferencia: 0, totalCobroClientes: 0,
+      totalEntradasManuales: 0, totalPagoProveedores: 0, totalSalidas: 0, ventasTotales: 0, gananciaReal: 0,
+    }
+  );
 
   async function cerrarCaja() {
     if (!turno) return;
@@ -97,6 +132,34 @@ export function CortePanel({ esAdmin }: { esAdmin: boolean }) {
       ) : (
         <div className="rounded-2xl border border-borde bg-surface p-5 mb-8 text-sm text-texto-suave">
           No tienes una caja abierta actualmente.
+        </div>
+      )}
+
+      {esAdmin && !cargandoCortes && cortesHoy.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-sm font-semibold text-texto-suave uppercase tracking-wide mb-1">Resumen del día de hoy</h2>
+          <p className="text-xs text-texto-muy-suave mb-3">
+            Suma de los {cortesHoy.length} corte{cortesHoy.length === 1 ? "" : "s"} cerrado{cortesHoy.length === 1 ? "" : "s"} hoy en esta sucursal
+            ({cortesHoy.map((c) => c.usuario.nombre).join(", ")}) — útil aunque la caja se haya abierto y cerrado varias veces en el día.
+          </p>
+          <div className="rounded-xl border border-borde divide-y divide-borde mb-3">
+            {CAMPOS_RESUMEN_DIA.map((f) => (
+              <div key={f.clave} className="flex justify-between px-4 py-2.5 text-sm">
+                <span className="text-texto-suave">{f.etiqueta}</span>
+                <span className="font-medium text-texto">{formatearMoneda(resumenHoy[f.clave])}</span>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-borde bg-surface p-4">
+              <p className="text-xs text-texto-suave">Ventas totales de hoy</p>
+              <p className="text-xl font-bold text-texto">{formatearMoneda(resumenHoy.ventasTotales)}</p>
+            </div>
+            <div className="rounded-xl border border-borde bg-surface p-4">
+              <p className="text-xs text-texto-suave">Ganancia real de hoy</p>
+              <p className="text-xl font-bold text-exito">{formatearMoneda(resumenHoy.gananciaReal)}</p>
+            </div>
+          </div>
         </div>
       )}
 
