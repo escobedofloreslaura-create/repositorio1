@@ -10,6 +10,12 @@ import type { PosCorteT } from "@/lib/pos/tipos";
 
 type ClaveMonto = "fondoInicial" | "totalEfectivo" | "totalTarjeta" | "totalTransferencia" | "totalCobroClientes" | "totalEntradasManuales" | "totalPagoProveedores" | "totalSalidas";
 
+const ETIQUETAS_TIPO_MOVIMIENTO: Record<string, string> = {
+  SALIDA: "Salida",
+  PAGO_PROVEEDOR: "Pago a proveedor",
+  ENTRADA_MANUAL: "Entrada manual",
+};
+
 const FILAS: { clave: ClaveMonto; etiqueta: string }[] = [
   { clave: "fondoInicial", etiqueta: "Fondo inicial" },
   { clave: "totalEfectivo", etiqueta: "Ventas de contado (efectivo)" },
@@ -47,6 +53,7 @@ export function ResumenCorte({ corte }: { corte: PosCorteT }) {
           gananciaReal: corte.gananciaReal,
           mostrarGanancia: corte.gananciaReal !== undefined,
           ventasPorDepartamento: corte.ventasPorDepartamento,
+          movimientosDetalle: corte.movimientosDetalle,
           efectivoEsperado: corte.efectivoEsperado,
           config,
         },
@@ -73,6 +80,22 @@ export function ResumenCorte({ corte }: { corte: PosCorteT }) {
           </div>
         ))}
       </div>
+
+      {corte.movimientosDetalle && corte.movimientosDetalle.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-texto-suave uppercase tracking-wide mb-2">Detalle de movimientos</h3>
+          <div className="rounded-xl border border-borde divide-y divide-borde">
+            {corte.movimientosDetalle.map((m, i) => (
+              <div key={i} className="flex justify-between px-4 py-2.5 text-sm gap-3">
+                <span className="text-texto-suave">
+                  {ETIQUETAS_TIPO_MOVIMIENTO[m.tipo] ?? m.tipo}: {m.concepto}
+                </span>
+                <span className="font-medium text-texto whitespace-nowrap">{formatearMoneda(m.monto)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {corte.ventasPorDepartamento && corte.ventasPorDepartamento.length > 0 && (
         <div>

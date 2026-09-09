@@ -7,6 +7,14 @@ function sumaPorTipo(movimientos: { tipo: string; monto: number }[], tipo: strin
   return movimientos.filter((m) => m.tipo === tipo).reduce((acc, m) => acc + m.monto, 0);
 }
 
+const TIPOS_MOVIMIENTO_CON_CONCEPTO = ["SALIDA", "PAGO_PROVEEDOR", "ENTRADA_MANUAL"];
+
+function detalleMovimientos(movimientos: { tipo: string; monto: number; concepto: string | null }[]) {
+  return movimientos
+    .filter((m) => TIPOS_MOVIMIENTO_CON_CONCEPTO.includes(m.tipo))
+    .map((m) => ({ tipo: m.tipo, concepto: m.concepto ?? "", monto: m.monto }));
+}
+
 // Corte de caja del día: resume entradas/salidas, ventas totales y la
 // ganancia real, y queda guardado de forma permanente para consultarlo después.
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -95,7 +103,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
       await tx.posTurno.update({ where: { id }, data: { estado: "CERRADO", cerradoEn: new Date() } });
 
-      return { ...nuevoCorte, ventasPorDepartamento };
+      return { ...nuevoCorte, ventasPorDepartamento, movimientosDetalle: detalleMovimientos(movimientos) };
     });
 
     // La ganancia (costo vs. venta) y el desglose por departamento son

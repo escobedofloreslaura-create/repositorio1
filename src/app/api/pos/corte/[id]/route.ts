@@ -3,6 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { requerirSesionPos, esAdminGeneral } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 
+const TIPOS_MOVIMIENTO_CON_CONCEPTO = ["SALIDA", "PAGO_PROVEEDOR", "ENTRADA_MANUAL"];
+
+function detalleMovimientos(movimientos: { tipo: string; monto: number; concepto: string | null }[]) {
+  return movimientos
+    .filter((m) => TIPOS_MOVIMIENTO_CON_CONCEPTO.includes(m.tipo))
+    .map((m) => ({ tipo: m.tipo, concepto: m.concepto ?? "", monto: m.monto }));
+}
+
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const sesion = await requerirSesionPos();
@@ -22,9 +30,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     // La ganancia (costo vs. venta) y el desglose por departamento son
     // información confidencial del negocio: solo los administradores la ven.
     // Un cajero solo ve el importe total de venta.
+    const movimientosDetalle = detalleMovimientos(corte.turno.movimientos);
+
     if (sesion.rol !== "ADMINISTRADOR") {
       const { costoVentas: _costoVentas, gananciaReal: _gananciaReal, ...resto } = corte;
-      return NextResponse.json({ ok: true, data: resto });
+      return NextResponse.json({ ok: true, data: { ...resto, movimientosDetalle } });
     }
 
     const ventasDetalladas = await prisma.posVenta.findMany({
@@ -43,7 +53,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       (a, b) => b.total - a.total
     );
 
-    return NextResponse.json({ ok: true, data: { ...corte, ventasPorDepartamento } });
+    return NextResponse.json({ ok: true, data: { ...corte, ventasPorDepartamento, movimientosDetalle } });
   } catch (e) {
     return respuestaError(e, "Error al obtener el corte");
   }

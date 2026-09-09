@@ -66,6 +66,8 @@ export interface PosCorteT {
   costoVentas?: number;
   gananciaReal?: number;
   ventasPorDepartamento?: { departamento: string; total: number }[];
+  /** Detalle de salidas, pagos a proveedores y entradas manuales, con su concepto. */
+  movimientosDetalle?: { tipo: string; concepto: string; monto: number }[];
   efectivoEsperado: number;
   usuario: { nombre: string };
 }

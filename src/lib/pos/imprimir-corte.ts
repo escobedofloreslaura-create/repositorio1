@@ -26,9 +26,17 @@ export interface DatosCorte {
   mostrarGanancia: boolean;
   /** Ausente para una sesión de cajero, igual que la ganancia. */
   ventasPorDepartamento?: { departamento: string; total: number }[];
+  /** Detalle de salidas, pagos a proveedores y entradas manuales, con su concepto. */
+  movimientosDetalle?: { tipo: string; concepto: string; monto: number }[];
   efectivoEsperado: number;
   config: ConfigCorte;
 }
+
+const ETIQUETAS_TIPO_MOVIMIENTO: Record<string, string> = {
+  SALIDA: "Salida",
+  PAGO_PROVEEDOR: "Pago a proveedor",
+  ENTRADA_MANUAL: "Entrada manual",
+};
 
 function escaparHtml(texto: string): string {
   return texto.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
@@ -46,7 +54,7 @@ const FILAS_CORTE: { clave: keyof DatosCorte; etiqueta: string }[] = [
 ];
 
 export function imprimirCorte(params: DatosCorte) {
-  const { fecha, cerradoPor, ventasTotales, gananciaReal, mostrarGanancia, ventasPorDepartamento, efectivoEsperado, config } = params;
+  const { fecha, cerradoPor, ventasTotales, gananciaReal, mostrarGanancia, ventasPorDepartamento, movimientosDetalle, efectivoEsperado, config } = params;
   const moneda = (m: number) => formatearMoneda(m, config.simboloMoneda);
 
   const filas = FILAS_CORTE.map(
@@ -55,6 +63,13 @@ export function imprimirCorte(params: DatosCorte) {
 
   const filasDepartamentos = (ventasPorDepartamento ?? [])
     .map((d) => `<tr><td>${escaparHtml(d.departamento)}</td><td class="derecha">${moneda(d.total)}</td></tr>`)
+    .join("");
+
+  const filasMovimientos = (movimientosDetalle ?? [])
+    .map(
+      (m) =>
+        `<tr><td>${escaparHtml(ETIQUETAS_TIPO_MOVIMIENTO[m.tipo] ?? m.tipo)}: ${escaparHtml(m.concepto)}</td><td class="derecha">${moneda(m.monto)}</td></tr>`
+    )
     .join("");
 
   const html = `<!doctype html>
@@ -86,6 +101,7 @@ export function imprimirCorte(params: DatosCorte) {
   <p>Fecha: ${formatearFechaImpresion(fecha)}<br/>Cerrado por: ${escaparHtml(cerradoPor)}</p>
   <div class="linea"></div>
   <table>${filas}</table>
+  ${filasMovimientos ? `<div class="linea"></div><p class="centro"><strong>Detalle de movimientos</strong></p><table>${filasMovimientos}</table>` : ""}
   ${filasDepartamentos ? `<div class="linea"></div><p class="centro"><strong>Ventas por departamento</strong></p><table>${filasDepartamentos}</table>` : ""}
   <div class="linea"></div>
   <table>
@@ -133,7 +149,7 @@ function filaDosColumnas(izquierda: string, derecha: string, ancho = ANCHO_TICKE
 }
 
 export function construirComandosCorte(params: DatosCorte): string[] {
-  const { fecha, cerradoPor, ventasTotales, gananciaReal, mostrarGanancia, ventasPorDepartamento, efectivoEsperado, config } = params;
+  const { fecha, cerradoPor, ventasTotales, gananciaReal, mostrarGanancia, ventasPorDepartamento, movimientosDetalle, efectivoEsperado, config } = params;
   const moneda = (m: number) => formatearMoneda(m, config.simboloMoneda);
   const linea = "-".repeat(ANCHO_TICKET) + "\n";
   const cmds: string[] = [];
@@ -147,6 +163,15 @@ export function construirComandosCorte(params: DatosCorte): string[] {
   cmds.push(`Fecha: ${formatearFechaImpresion(fecha)}\n`, `Cerrado por: ${cerradoPor}\n`, linea);
 
   for (const f of FILAS_CORTE) cmds.push(filaDosColumnas(f.etiqueta, moneda(params[f.clave] as number)));
+
+  if (movimientosDetalle && movimientosDetalle.length > 0) {
+    cmds.push(linea, escpos.centrar, escpos.negritaOn, "DETALLE DE MOVIMIENTOS\n", escpos.negritaOff, escpos.izquierda);
+    for (const m of movimientosDetalle) {
+      const etiqueta = `${ETIQUETAS_TIPO_MOVIMIENTO[m.tipo] ?? m.tipo}: ${m.concepto}`;
+      envolverTexto(etiqueta).forEach((l) => cmds.push(l + "\n"));
+      cmds.push(filaDosColumnas("", moneda(m.monto)));
+    }
+  }
 
   if (ventasPorDepartamento && ventasPorDepartamento.length > 0) {
     cmds.push(linea, escpos.centrar, escpos.negritaOn, "VENTAS POR DEPARTAMENTO\n", escpos.negritaOff, escpos.izquierda);
