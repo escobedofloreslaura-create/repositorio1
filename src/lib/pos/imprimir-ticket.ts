@@ -11,6 +11,7 @@ interface ItemTicketImprimir {
 interface PagoTicketImprimir {
   forma: FormaPago;
   monto: number;
+  referencia?: string | null;
 }
 
 interface ConfigTicket {
@@ -56,7 +57,11 @@ export function imprimirTicket(params: DatosTicket) {
     .join("");
 
   const filasPagos = pagos
-    .map((p) => `<tr><td>${ETIQUETAS_FORMA_PAGO[p.forma]}</td><td></td><td class="derecha">${moneda(p.monto)}</td></tr>`)
+    .map(
+      (p) => `
+        <tr><td>${ETIQUETAS_FORMA_PAGO[p.forma]}</td><td></td><td class="derecha">${moneda(p.monto)}</td></tr>
+        ${p.referencia ? `<tr><td colspan="3" class="ref">Folio: ${escaparHtml(p.referencia)}</td></tr>` : ""}`
+    )
     .join("");
 
   const html = `<!doctype html>
@@ -75,6 +80,7 @@ export function imprimirTicket(params: DatosTicket) {
   td { padding: 2px 0; vertical-align: top; }
   td.nombre { padding-top: 6px; font-weight: bold; }
   td.derecha { text-align: right; white-space: nowrap; }
+  td.ref { font-size: 11px; color: #444; padding-top: 0; }
   .total { font-size: 15px; font-weight: bold; }
   .pie { text-align: center; margin-top: 10px; font-size: 12px; }
 </style>
@@ -156,7 +162,10 @@ export function construirComandosTicket(params: DatosTicket): string[] {
   }
   cmds.push(linea, escpos.negritaOn, filaDosColumnas("TOTAL", moneda(total)), escpos.negritaOff, linea);
 
-  for (const pago of pagos) cmds.push(filaDosColumnas(ETIQUETAS_FORMA_PAGO[pago.forma], moneda(pago.monto)));
+  for (const pago of pagos) {
+    cmds.push(filaDosColumnas(ETIQUETAS_FORMA_PAGO[pago.forma], moneda(pago.monto)));
+    if (pago.referencia) cmds.push(`Folio: ${pago.referencia}\n`);
+  }
   cmds.push(linea, escpos.centrar);
   envolverTexto(config.mensajeTicket).forEach((l) => cmds.push(l + "\n"));
   cmds.push(escpos.salto, escpos.salto, escpos.salto, escpos.cortar);

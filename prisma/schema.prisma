@@ -668,10 +668,11 @@ model PosDetalleVenta {
 }
 
 model PosPagoVenta {
-  id      String @id @default(cuid())
-  ventaId String
-  forma   String // EFECTIVO | TARJETA | TRANSFERENCIA | CREDITO
-  monto   Float
+  id         String  @id @default(cuid())
+  ventaId    String
+  forma      String // EFECTIVO | TARJETA | TRANSFERENCIA | CREDITO
+  monto      Float
+  referencia String? // Folio/autorización de la terminal (tarjeta/transferencia)
 
   venta PosVenta @relation(fields: [ventaId], references: [id], onDelete: Cascade)
 

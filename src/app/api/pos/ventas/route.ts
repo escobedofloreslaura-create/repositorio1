@@ -17,6 +17,7 @@ interface ItemEntrada {
 interface PagoEntrada {
   forma: "EFECTIVO" | "TARJETA" | "TRANSFERENCIA" | "CREDITO";
   monto: number;
+  referencia?: string | null;
 }
 
 const TOLERANCIA = 0.01;
@@ -159,7 +160,7 @@ export async function POST(req: NextRequest) {
 
       for (const pago of pagos) {
         await tx.posPagoVenta.create({
-          data: { ventaId: nuevaVenta.id, forma: pago.forma, monto: pago.monto },
+          data: { ventaId: nuevaVenta.id, forma: pago.forma, monto: pago.monto, referencia: pago.referencia?.trim() || null },
         });
 
         const tipoMovimiento = TIPO_VENTA_POR_FORMA[pago.forma];

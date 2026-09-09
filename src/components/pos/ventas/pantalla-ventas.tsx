@@ -184,7 +184,7 @@ export function PantallaVentas() {
 
   const total = ticketActivo?.items.reduce((a, i) => a + i.cantidad * i.precioUnitario, 0) ?? 0;
 
-  async function confirmarCobro(pagos: { forma: FormaPago; monto: number }[], clienteId: string | null) {
+  async function confirmarCobro(pagos: { forma: FormaPago; monto: number; referencia?: string }[], clienteId: string | null) {
     if (!ticketActivo || !turno) return;
     setProcesandoCobro(true);
     try {
