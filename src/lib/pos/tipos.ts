@@ -19,7 +19,8 @@ export interface PosProductoT {
   departamentoId: string;
   departamento?: PosDepartamentoT;
   unidad: "PIEZA" | "CAJA";
-  precioCosto: number;
+  /** Ausente para sesiones de cajero: el precio de costo es confidencial, solo lo ve un administrador. */
+  precioCosto?: number;
   precioVenta: number;
   precioMayoreo: number | null;
   existencia: number;

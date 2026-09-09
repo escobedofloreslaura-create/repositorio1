@@ -16,11 +16,14 @@ import type { PosProductoT, PosDepartamentoT } from "@/lib/pos/tipos";
 export function ProductosPanel({
   puedeEditarCatalogo,
   puedeAjustarInventario,
+  esAdmin,
 }: {
   /** Nombre, precios, alta/baja del producto: solo el Administrador General (catálogo único de la cadena). */
   puedeEditarCatalogo: boolean;
   /** Entradas/salidas/ajustes de existencia en la sucursal activa: cualquier administrador. */
   puedeAjustarInventario: boolean;
+  /** El precio de costo es confidencial: solo lo ve un administrador. */
+  esAdmin: boolean;
 }) {
   const [productos, setProductos] = useState<PosProductoT[]>([]);
   const [departamentos, setDepartamentos] = useState<PosDepartamentoT[]>([]);
@@ -112,7 +115,7 @@ export function ProductosPanel({
               <tr className="border-b border-borde text-left text-texto-suave">
                 <th className="p-3 font-medium">Producto</th>
                 <th className="p-3 font-medium">Departamento</th>
-                <th className="p-3 font-medium text-right">Costo</th>
+                {esAdmin && <th className="p-3 font-medium text-right">Costo</th>}
                 <th className="p-3 font-medium text-right">Venta</th>
                 <th className="p-3 font-medium text-right">Mayoreo</th>
                 <th className="p-3 font-medium text-right">Existencia</th>
@@ -127,7 +130,7 @@ export function ProductosPanel({
                     <div className="text-xs text-texto-muy-suave">{p.codigoBarras ?? "sin código"} · {p.unidad === "CAJA" ? "Caja" : "Pieza"}</div>
                   </td>
                   <td className="p-3 text-texto-suave">{p.departamento?.nombre}</td>
-                  <td className="p-3 text-right">{formatearMoneda(p.precioCosto)}</td>
+                  {esAdmin && <td className="p-3 text-right">{formatearMoneda(p.precioCosto ?? 0)}</td>}
                   <td className="p-3 text-right font-medium">{formatearMoneda(p.precioVenta)}</td>
                   <td className="p-3 text-right text-texto-suave">{p.precioMayoreo ? formatearMoneda(p.precioMayoreo) : "—"}</td>
                   <td className="p-3 text-right">

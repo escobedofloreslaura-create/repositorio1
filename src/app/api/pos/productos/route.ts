@@ -64,6 +64,13 @@ export async function GET(req: NextRequest) {
       ? conExistencia.filter((p) => p.existencia <= p.existenciaMinima)
       : conExistencia;
 
+    // El precio de costo es información confidencial del negocio: solo lo
+    // ve un administrador. Un cajero solo ve el precio de venta.
+    if (sesion.rol !== "ADMINISTRADOR") {
+      const sinCosto = filtrados.map(({ precioCosto: _precioCosto, ...resto }) => resto);
+      return NextResponse.json({ ok: true, data: sinCosto });
+    }
+
     return NextResponse.json({ ok: true, data: filtrados });
   } catch (e) {
     return respuestaError(e, "Error al obtener productos");
