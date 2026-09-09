@@ -170,6 +170,11 @@ export function ProductosPanel({
           departamentos={departamentos}
           onCerrar={() => setModalEdicion(null)}
           onGuardado={() => { setModalEdicion(null); cargar(); }}
+          onModificarInventario={
+            puedeAjustarInventario && modalEdicion.producto
+              ? () => { setModalMovimiento(modalEdicion.producto); setModalEdicion(null); }
+              : undefined
+          }
         />
       )}
       {modalMovimiento && (

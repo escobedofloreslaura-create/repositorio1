@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Campo, Select } from "@/components/ui/campo";
 import { Boton } from "@/components/ui/boton";
+import { PackageSearch } from "lucide-react";
 import toast from "react-hot-toast";
 import type { PosProductoT, PosDepartamentoT } from "@/lib/pos/tipos";
 
@@ -11,11 +12,14 @@ export function ModalProducto({
   departamentos,
   onCerrar,
   onGuardado,
+  onModificarInventario,
 }: {
   producto: PosProductoT | null;
   departamentos: PosDepartamentoT[];
   onCerrar: () => void;
   onGuardado: () => void;
+  /** Presente solo si el usuario puede ajustar existencia; abre el movimiento de inventario para este producto. */
+  onModificarInventario?: () => void;
 }) {
   const [form, setForm] = useState({
     nombre: producto?.nombre ?? "",
@@ -119,7 +123,18 @@ export function ModalProducto({
             />
           </div>
         )}
-        {producto && (
+        {producto && onModificarInventario && (
+          <div className="rounded-xl border border-borde p-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-texto">Existencia actual: {producto.existencia}</p>
+              <p className="text-xs text-texto-muy-suave">Ajusta la cantidad o la existencia mínima en tu sucursal activa.</p>
+            </div>
+            <Boton type="button" variante="secundario" icono={<PackageSearch className="h-4 w-4" />} onClick={onModificarInventario}>
+              Modificar inventario
+            </Boton>
+          </div>
+        )}
+        {producto && !onModificarInventario && (
           <p className="text-xs text-texto-muy-suave">
             Para ajustar existencia o existencia mínima por sucursal usa el botón de movimiento de inventario.
           </p>
