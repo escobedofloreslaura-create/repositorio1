@@ -1,4 +1,4 @@
-import { formatearMoneda, formatearFechaHumana } from "@/lib/formato";
+import { formatearMoneda, formatearFechaImpresion } from "@/lib/formato";
 import { escpos, qzImprimirRaw } from "@/lib/pos/qz";
 
 interface ConfigCorte {
@@ -75,7 +75,7 @@ export function imprimirCorte(params: DatosCorte) {
   ${config.telefono ? `<p class="centro">Tel: ${escaparHtml(config.telefono)}</p>` : ""}
   <div class="linea"></div>
   <h2>Corte de caja</h2>
-  <p>Fecha: ${formatearFechaHumana(fecha)}<br/>Cerrado por: ${escaparHtml(cerradoPor)}</p>
+  <p>Fecha: ${formatearFechaImpresion(fecha)}<br/>Cerrado por: ${escaparHtml(cerradoPor)}</p>
   <div class="linea"></div>
   <table>${filas}</table>
   <div class="linea"></div>
@@ -135,7 +135,7 @@ export function construirComandosCorte(params: DatosCorte): string[] {
   if (config.direccion) envolverTexto(config.direccion).forEach((l) => cmds.push(l + "\n"));
   if (config.telefono) cmds.push(`Tel: ${config.telefono}\n`);
   cmds.push(escpos.izquierda, linea, escpos.centrar, escpos.negritaOn, "CORTE DE CAJA\n", escpos.negritaOff, escpos.izquierda);
-  cmds.push(`Fecha: ${formatearFechaHumana(fecha)}\n`, `Cerrado por: ${cerradoPor}\n`, linea);
+  cmds.push(`Fecha: ${formatearFechaImpresion(fecha)}\n`, `Cerrado por: ${cerradoPor}\n`, linea);
 
   for (const f of FILAS_CORTE) cmds.push(filaDosColumnas(f.etiqueta, moneda(params[f.clave] as number)));
   cmds.push(linea, escpos.negritaOn);

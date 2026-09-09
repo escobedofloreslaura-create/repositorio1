@@ -1,4 +1,4 @@
-import { formatearMoneda, formatearFechaHumana } from "@/lib/formato";
+import { formatearMoneda, formatearFechaImpresion } from "@/lib/formato";
 import { ETIQUETAS_FORMA_PAGO, type FormaPago } from "@/lib/pos/constantes";
 import { escpos, qzImprimirRaw } from "@/lib/pos/qz";
 
@@ -91,7 +91,7 @@ export function imprimirTicket(params: DatosTicket) {
   ${config.direccion ? `<p class="centro">${escaparHtml(config.direccion)}</p>` : ""}
   ${config.telefono ? `<p class="centro">Tel: ${escaparHtml(config.telefono)}</p>` : ""}
   <div class="linea"></div>
-  <p>Ticket: #${folio}<br/>Fecha: ${formatearFechaHumana(fecha)}<br/>Cajero: ${escaparHtml(cajero)}${cliente ? `<br/>Cliente: ${escaparHtml(cliente)}` : ""}</p>
+  <p>Ticket: #${folio}<br/>Fecha: ${formatearFechaImpresion(fecha)}<br/>Cajero: ${escaparHtml(cajero)}${cliente ? `<br/>Cliente: ${escaparHtml(cliente)}` : ""}</p>
   <div class="linea"></div>
   <table>${filasItems}</table>
   <div class="linea"></div>
@@ -152,7 +152,7 @@ export function construirComandosTicket(params: DatosTicket): string[] {
   if (config.direccion) envolverTexto(config.direccion).forEach((l) => cmds.push(l + "\n"));
   if (config.telefono) cmds.push(`Tel: ${config.telefono}\n`);
   cmds.push(escpos.izquierda, linea);
-  cmds.push(`Ticket: #${folio}\n`, `Fecha: ${formatearFechaHumana(fecha)}\n`, `Cajero: ${cajero}\n`);
+  cmds.push(`Ticket: #${folio}\n`, `Fecha: ${formatearFechaImpresion(fecha)}\n`, `Cajero: ${cajero}\n`);
   if (cliente) cmds.push(`Cliente: ${cliente}\n`);
   cmds.push(linea);
 

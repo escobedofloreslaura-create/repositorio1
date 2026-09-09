@@ -213,7 +213,14 @@ export function PantallaVentas() {
       toast.success(`Venta #${json.data.folio} registrada`);
       setModalCobro(false);
       setVersionCatalogo((v) => v + 1);
-      if (config) {
+      // Se pide la configuración justo antes de imprimir (en vez de reusar el
+      // estado cargado al abrir la pantalla) porque el Administrador General
+      // puede haber cambiado de sucursal activa desde entonces, y cada
+      // sucursal tiene su propio nombre/dirección/impresora.
+      const resConfig = await fetch("/api/pos/config");
+      const jsonConfig = await resConfig.json();
+      const configActual = jsonConfig.ok ? jsonConfig.data : config;
+      if (configActual) {
         imprimirTicketAutomatico(
           {
             folio: json.data.folio,
@@ -223,11 +230,11 @@ export function PantallaVentas() {
             items: ticketActivo.items.map((i) => ({ descripcion: i.nombre, cantidad: i.cantidad, precioUnitario: i.precioUnitario })),
             pagos,
             total,
-            config,
+            config: configActual,
           },
-          config.impresora
+          configActual.impresora
         ).then((via) => {
-          if (via === "navegador" && config.impresora) {
+          if (via === "navegador" && configActual.impresora) {
             toast("No se pudo conectar con QZ Tray, se abrió el diálogo de impresión.", { icon: "⚠️" });
           }
         });
