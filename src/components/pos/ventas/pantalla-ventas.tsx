@@ -12,7 +12,7 @@ import { ModalSalidaCaja } from "./modal-salida-caja";
 import { ModalProductoComun } from "./modal-producto-comun";
 import { ModalCobro } from "./modal-cobro";
 import { imprimirTicketAutomatico } from "@/lib/pos/imprimir-ticket";
-import type { PosProductoT, PosDepartamentoT, ItemTicket, Ticket } from "@/lib/pos/tipos";
+import type { PosProductoT, ItemTicket, Ticket } from "@/lib/pos/tipos";
 import type { FormaPago } from "@/lib/pos/constantes";
 
 interface ConfigTicket {
@@ -33,7 +33,6 @@ function ticketNuevo(numero: number): Ticket {
 
 export function PantallaVentas() {
   const [turno, setTurno] = useState<{ id: string; fondoInicial: number } | null | undefined>(undefined);
-  const [departamentos, setDepartamentos] = useState<PosDepartamentoT[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ticketActivoId, setTicketActivoId] = useState<string>("");
   const [modalProductoComun, setModalProductoComun] = useState(false);
@@ -46,9 +45,6 @@ export function PantallaVentas() {
 
   useEffect(() => {
     cargarTurno();
-    fetch("/api/pos/departamentos")
-      .then((r) => r.json())
-      .then((json) => { if (json.ok) setDepartamentos(json.data); });
     fetch("/api/pos/config")
       .then((r) => r.json())
       .then((json) => { if (json.ok) setConfig(json.data); });
@@ -260,20 +256,17 @@ export function PantallaVentas() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-dvh">
-      <div className="flex-1 lg:border-r border-borde min-h-[40vh]">
-        <BuscadorProductos
-          departamentos={departamentos}
-          version={versionCatalogo}
-          onSeleccionar={agregarProducto}
-          onCodigoNoEncontrado={() => {
-            toast("Código no encontrado. Usa 'Producto común' para venderlo directamente.", { icon: "ℹ️" });
-            setModalProductoComun(true);
-          }}
-        />
-      </div>
+    <div className="flex flex-col h-dvh bg-surface">
+      <BuscadorProductos
+        version={versionCatalogo}
+        onSeleccionar={agregarProducto}
+        onCodigoNoEncontrado={() => {
+          toast("Código no encontrado. Usa 'Producto común' para venderlo directamente.", { icon: "ℹ️" });
+          setModalProductoComun(true);
+        }}
+      />
 
-      <div className="w-full lg:w-[420px] flex flex-col bg-surface">
+      <div className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center gap-1 border-b border-borde px-3 pt-3 overflow-x-auto">
           {tickets.map((t) => (
             <button
