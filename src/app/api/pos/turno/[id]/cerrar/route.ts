@@ -82,7 +82,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           costoVentas,
           gananciaReal: ventasTotales - costoVentas,
           efectivoEsperado,
-          usuarioId: sesion.id,
+          // Se atribuye al usuario dueño del turno (no a quien hace clic en
+          // "Cerrar caja"), para que una caja reasignada a un cajero quede
+          // registrada a su nombre aunque un administrador la cierre por él.
+          usuarioId: turno.usuarioId,
         },
         include: { usuario: { select: { nombre: true } } },
       });
