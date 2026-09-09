@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Landmark, Lock } from "lucide-react";
+import { Landmark, Lock, UserCog } from "lucide-react";
 import { Boton } from "@/components/ui/boton";
+import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/campo";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonLista } from "@/components/ui/skeleton";
 import { formatearMoneda, formatearFecha } from "@/lib/formato";
@@ -13,15 +15,27 @@ import type { PosCorteT } from "@/lib/pos/tipos";
 interface TurnoActual {
   id: string;
   fondoInicial: number;
+  usuarioId: string;
+  sucursalId: string;
 }
 
-export function CortePanel() {
+interface UsuarioPos {
+  id: string;
+  nombre: string;
+  usuario: string;
+  rol: "ADMINISTRADOR" | "CAJERO";
+  sucursalId: string | null;
+  activo: boolean;
+}
+
+export function CortePanel({ esAdmin }: { esAdmin: boolean }) {
   const [turno, setTurno] = useState<TurnoActual | null | undefined>(undefined);
   const [cortes, setCortes] = useState<PosCorteT[]>([]);
   const [cargandoCortes, setCargandoCortes] = useState(true);
   const [cerrando, setCerrando] = useState(false);
   const [corteRecien, setCorteRecien] = useState<PosCorteT | null>(null);
   const [corteAbierto, setCorteAbierto] = useState<string | null>(null);
+  const [modalReasignar, setModalReasignar] = useState(false);
 
   async function cargarTurno() {
     const res = await fetch("/api/pos/turno/actual");
@@ -69,9 +83,16 @@ export function CortePanel() {
           <p className="text-sm text-texto-suave">
             Al cerrar tu caja se generará el corte del día con el resumen de entradas, salidas, ventas totales y la ganancia real.
           </p>
-          <Boton variante="peligro" icono={<Lock className="h-4 w-4" />} cargando={cerrando} onClick={cerrarCaja}>
-            Cerrar caja y generar corte
-          </Boton>
+          <div className="flex flex-wrap gap-2">
+            <Boton variante="peligro" icono={<Lock className="h-4 w-4" />} cargando={cerrando} onClick={cerrarCaja}>
+              Cerrar caja y generar corte
+            </Boton>
+            {esAdmin && (
+              <Boton variante="secundario" icono={<UserCog className="h-4 w-4" />} onClick={() => setModalReasignar(true)}>
+                Reasignar caja
+              </Boton>
+            )}
+          </div>
         </div>
       ) : (
         <div className="rounded-2xl border border-borde bg-surface p-5 mb-8 text-sm text-texto-suave">
@@ -105,7 +126,9 @@ export function CortePanel() {
               </div>
               <div className="text-right">
                 <div className="text-sm font-semibold text-texto">{formatearMoneda(c.ventasTotales)}</div>
-                <div className="text-xs text-exito">Ganancia: {formatearMoneda(c.gananciaReal)}</div>
+                {c.gananciaReal !== undefined && (
+                  <div className="text-xs text-exito">Ganancia: {formatearMoneda(c.gananciaReal)}</div>
+                )}
               </div>
             </button>
           ))}
@@ -113,6 +136,103 @@ export function CortePanel() {
       )}
 
       {corteAbierto && <ModalDetalleCorte corteId={corteAbierto} onCerrar={() => setCorteAbierto(null)} />}
+      {modalReasignar && turno && (
+        <ModalReasignarCaja
+          turno={turno}
+          onCerrar={() => setModalReasignar(false)}
+          onReasignado={() => { setModalReasignar(false); cargarTurno(); }}
+        />
+      )}
     </div>
+  );
+}
+
+function ModalReasignarCaja({
+  turno,
+  onCerrar,
+  onReasignado,
+}: {
+  turno: TurnoActual;
+  onCerrar: () => void;
+  onReasignado: () => void;
+}) {
+  const [usuarios, setUsuarios] = useState<UsuarioPos[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [usuarioId, setUsuarioId] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/pos/usuarios")
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.ok) {
+          const elegibles = (json.data as UsuarioPos[]).filter(
+            (u) => u.sucursalId === turno.sucursalId && u.activo && u.id !== turno.usuarioId
+          );
+          setUsuarios(elegibles);
+          if (elegibles.length > 0) setUsuarioId(elegibles[0].id);
+        }
+      })
+      .finally(() => setCargando(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function reasignar() {
+    if (!usuarioId) return;
+    setEnviando(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/pos/turno/${turno.id}/reasignar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuarioId }),
+      });
+      const json = await res.json();
+      if (!json.ok) {
+        setError(json.error ?? "Error al reasignar la caja");
+        return;
+      }
+      toast.success("Caja reasignada");
+      onReasignado();
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <Modal abierto onCerrar={onCerrar} titulo="Reasignar caja">
+      <div className="space-y-4">
+        <p className="text-sm text-texto-suave">
+          El turno seguirá abierto, pero pasará a nombre de la persona que elijas — será quien pueda hacer el corte al final del día.
+        </p>
+        {cargando ? (
+          <p className="text-sm text-texto-suave">Cargando…</p>
+        ) : usuarios.length === 0 ? (
+          <p className="text-sm text-texto-suave">No hay otro usuario activo en esta sucursal para reasignar la caja.</p>
+        ) : (
+          <Select
+            label="Reasignar a"
+            value={usuarioId}
+            onChange={(e) => setUsuarioId(e.target.value)}
+            opciones={usuarios.map((u) => ({ valor: u.id, etiqueta: `${u.nombre} (${u.rol === "ADMINISTRADOR" ? "Administrador" : "Cajero"})` }))}
+          />
+        )}
+        {error && <p className="text-sm text-peligro">{error}</p>}
+        <div className="flex gap-2">
+          <Boton type="button" variante="secundario" className="flex-1" onClick={onCerrar}>Cancelar</Boton>
+          <Boton
+            type="button"
+            variante="primario"
+            className="flex-1"
+            disabled={usuarios.length === 0}
+            cargando={enviando}
+            onClick={reasignar}
+          >
+            Reasignar
+          </Boton>
+        </div>
+      </div>
+    </Modal>
   );
 }

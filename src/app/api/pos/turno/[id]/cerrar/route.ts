@@ -83,6 +83,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       return nuevoCorte;
     });
 
+    // La ganancia (costo vs. venta) es información confidencial del negocio:
+    // solo los administradores la ven. Un cajero solo ve el importe de venta.
+    if (sesion.rol !== "ADMINISTRADOR") {
+      const { costoVentas: _costoVentas, gananciaReal: _gananciaReal, ...resto } = corte;
+      return NextResponse.json({ ok: true, data: resto });
+    }
+
     return NextResponse.json({ ok: true, data: corte });
   } catch (e) {
     if (e instanceof Error && e.message === "NO_ENCONTRADA") {

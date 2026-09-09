@@ -21,7 +21,9 @@ export interface DatosCorte {
   totalPagoProveedores: number;
   totalSalidas: number;
   ventasTotales: number;
-  gananciaReal: number;
+  gananciaReal?: number;
+  /** false para una sesión de cajero: la ganancia no se imprime, solo el importe de venta. */
+  mostrarGanancia: boolean;
   efectivoEsperado: number;
   config: ConfigCorte;
 }
@@ -42,7 +44,7 @@ const FILAS_CORTE: { clave: keyof DatosCorte; etiqueta: string }[] = [
 ];
 
 export function imprimirCorte(params: DatosCorte) {
-  const { fecha, cerradoPor, ventasTotales, gananciaReal, efectivoEsperado, config } = params;
+  const { fecha, cerradoPor, ventasTotales, gananciaReal, mostrarGanancia, efectivoEsperado, config } = params;
   const moneda = (m: number) => formatearMoneda(m, config.simboloMoneda);
 
   const filas = FILAS_CORTE.map(
@@ -81,7 +83,7 @@ export function imprimirCorte(params: DatosCorte) {
   <div class="linea"></div>
   <table>
     <tr class="total"><td>Ventas totales</td><td class="derecha">${moneda(ventasTotales)}</td></tr>
-    <tr class="total"><td>Ganancia real</td><td class="derecha">${moneda(gananciaReal)}</td></tr>
+    ${mostrarGanancia && gananciaReal !== undefined ? `<tr class="total"><td>Ganancia real</td><td class="derecha">${moneda(gananciaReal)}</td></tr>` : ""}
   </table>
   <div class="linea"></div>
   <table>
@@ -124,7 +126,7 @@ function filaDosColumnas(izquierda: string, derecha: string, ancho = ANCHO_TICKE
 }
 
 export function construirComandosCorte(params: DatosCorte): string[] {
-  const { fecha, cerradoPor, ventasTotales, gananciaReal, efectivoEsperado, config } = params;
+  const { fecha, cerradoPor, ventasTotales, gananciaReal, mostrarGanancia, efectivoEsperado, config } = params;
   const moneda = (m: number) => formatearMoneda(m, config.simboloMoneda);
   const linea = "-".repeat(ANCHO_TICKET) + "\n";
   const cmds: string[] = [];
@@ -140,7 +142,7 @@ export function construirComandosCorte(params: DatosCorte): string[] {
   for (const f of FILAS_CORTE) cmds.push(filaDosColumnas(f.etiqueta, moneda(params[f.clave] as number)));
   cmds.push(linea, escpos.negritaOn);
   cmds.push(filaDosColumnas("Ventas totales", moneda(ventasTotales)));
-  cmds.push(filaDosColumnas("Ganancia real", moneda(gananciaReal)));
+  if (mostrarGanancia && gananciaReal !== undefined) cmds.push(filaDosColumnas("Ganancia real", moneda(gananciaReal)));
   cmds.push(linea);
   cmds.push(filaDosColumnas("Efectivo esperado", moneda(efectivoEsperado)));
   cmds.push(escpos.negritaOff, escpos.salto, escpos.salto, escpos.salto, escpos.cortar);

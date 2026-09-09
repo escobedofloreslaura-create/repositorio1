@@ -28,7 +28,14 @@ export async function GET(req: NextRequest) {
       orderBy: { fecha: "desc" },
     });
 
-    return NextResponse.json({ ok: true, data: cortes });
+    // La ganancia (costo vs. venta) es información confidencial del negocio:
+    // solo los administradores la ven. Un cajero solo ve el importe de venta.
+    const data =
+      sesion.rol === "ADMINISTRADOR"
+        ? cortes
+        : cortes.map(({ costoVentas: _costoVentas, gananciaReal: _gananciaReal, ...resto }) => resto);
+
+    return NextResponse.json({ ok: true, data });
   } catch (e) {
     return respuestaError(e, "Error al obtener el histórico de cortes");
   }

@@ -62,8 +62,9 @@ export interface PosCorteT {
   totalSalidas: number;
   totalEntradasManuales: number;
   ventasTotales: number;
-  costoVentas: number;
-  gananciaReal: number;
+  /** Ausente para sesiones de cajero: la ganancia es confidencial, solo la ve un administrador. */
+  costoVentas?: number;
+  gananciaReal?: number;
   efectivoEsperado: number;
   usuario: { nombre: string };
 }

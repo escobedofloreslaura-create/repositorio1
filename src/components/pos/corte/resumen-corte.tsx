@@ -3,6 +3,7 @@ import { Printer } from "lucide-react";
 import { Tarjeta } from "@/components/ui/tarjeta";
 import { Boton } from "@/components/ui/boton";
 import { formatearMoneda } from "@/lib/formato";
+import { cn } from "@/lib/utils";
 import { imprimirCorteAutomatico } from "@/lib/pos/imprimir-corte";
 import toast from "react-hot-toast";
 import type { PosCorteT } from "@/lib/pos/tipos";
@@ -44,6 +45,7 @@ export function ResumenCorte({ corte }: { corte: PosCorteT }) {
           totalSalidas: corte.totalSalidas,
           ventasTotales: corte.ventasTotales,
           gananciaReal: corte.gananciaReal,
+          mostrarGanancia: corte.gananciaReal !== undefined,
           efectivoEsperado: corte.efectivoEsperado,
           config,
         },
@@ -71,15 +73,17 @@ export function ResumenCorte({ corte }: { corte: PosCorteT }) {
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className={cn("grid gap-3", corte.gananciaReal !== undefined ? "grid-cols-2" : "grid-cols-1")}>
         <Tarjeta padding="md">
           <p className="text-xs text-texto-suave">Ventas totales del día</p>
           <p className="text-xl font-bold text-texto">{formatearMoneda(corte.ventasTotales)}</p>
         </Tarjeta>
-        <Tarjeta padding="md">
-          <p className="text-xs text-texto-suave">Ganancia real del día</p>
-          <p className="text-xl font-bold text-exito">{formatearMoneda(corte.gananciaReal)}</p>
-        </Tarjeta>
+        {corte.gananciaReal !== undefined && (
+          <Tarjeta padding="md">
+            <p className="text-xs text-texto-suave">Ganancia real del día</p>
+            <p className="text-xl font-bold text-exito">{formatearMoneda(corte.gananciaReal)}</p>
+          </Tarjeta>
+        )}
       </div>
 
       <Tarjeta padding="md" className="bg-marca-suave border-marca/20">
