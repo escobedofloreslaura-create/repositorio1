@@ -84,6 +84,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           efectivoEsperado,
           usuarioId: sesion.id,
         },
+        include: { usuario: { select: { nombre: true } } },
       });
 
       await tx.posTurno.update({ where: { id }, data: { estado: "CERRADO", cerradoEn: new Date() } });
