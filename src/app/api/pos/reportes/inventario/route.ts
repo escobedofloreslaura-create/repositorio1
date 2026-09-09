@@ -8,6 +8,12 @@ import { respuestaError } from "@/lib/pos/api-utils";
 export async function GET() {
   try {
     const sesion = await requerirSesionPos();
+    // El reporte de inventario expone el precio de costo y el valor del
+    // inventario: información confidencial del negocio, solo para
+    // administradores.
+    if (sesion.rol !== "ADMINISTRADOR") {
+      return NextResponse.json({ ok: false, error: "No tienes permiso para ver el inventario" }, { status: 403 });
+    }
     const sucursalId = await requerirSucursalActiva(sesion);
 
     const existencias = await prisma.posExistencia.findMany({

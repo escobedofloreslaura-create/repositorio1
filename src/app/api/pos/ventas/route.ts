@@ -25,6 +25,12 @@ const TOLERANCIA = 0.01;
 export async function GET(req: NextRequest) {
   try {
     const sesion = await requerirSesionPos();
+    // El histórico de ventas expone el detalle y costo de cada línea de
+    // venta de toda la sucursal (no solo del turno actual): es información
+    // confidencial del negocio, solo para administradores.
+    if (sesion.rol !== "ADMINISTRADOR") {
+      return NextResponse.json({ ok: false, error: "No tienes permiso para ver el histórico de ventas" }, { status: 403 });
+    }
     const sucursalId = await requerirSucursalActiva(sesion);
     const { searchParams } = new URL(req.url);
     const desde = searchParams.get("desde");

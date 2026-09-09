@@ -8,6 +8,11 @@ import { respuestaError } from "@/lib/pos/api-utils";
 export async function GET(req: NextRequest) {
   try {
     const sesion = await requerirSesionPos();
+    // Igual que el reporte de inventario, el kardex es información
+    // confidencial del negocio: solo para administradores.
+    if (sesion.rol !== "ADMINISTRADOR") {
+      return NextResponse.json({ ok: false, error: "No tienes permiso para ver el kardex" }, { status: 403 });
+    }
     const sucursalId = await requerirSucursalActiva(sesion);
     const { searchParams } = new URL(req.url);
     const productoId = searchParams.get("productoId");
