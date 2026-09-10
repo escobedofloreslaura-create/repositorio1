@@ -17,6 +17,8 @@ interface Fila {
   bajaExistencia: boolean;
   precioCosto: number;
   precioVenta: number;
+  precioMayoreo: number | null;
+  precioClienteFrecuente: number | null;
   valorCosto: number;
   valorVenta: number;
 }
@@ -53,6 +55,8 @@ export function ReporteInventario({ puedeImportar }: { puedeImportar: boolean })
         "Existencia mínima": f.existenciaMinima,
         "Precio costo": f.precioCosto,
         "Precio venta": f.precioVenta,
+        "Precio mayoreo": f.precioMayoreo ?? "",
+        "Precio cliente frecuente": f.precioClienteFrecuente ?? "",
         "Valor a costo": f.valorCosto,
         "Valor a venta": f.valorVenta,
       }))
@@ -101,6 +105,8 @@ export function ReporteInventario({ puedeImportar }: { puedeImportar: boolean })
               <th className="p-3 font-medium">Producto</th>
               <th className="p-3 font-medium">Departamento</th>
               <th className="p-3 font-medium text-right">Existencia</th>
+              <th className="p-3 font-medium text-right">Mayoreo</th>
+              <th className="p-3 font-medium text-right">Cliente frecuente</th>
               <th className="p-3 font-medium text-right">Valor costo</th>
               <th className="p-3 font-medium text-right">Valor venta</th>
             </tr>
@@ -113,6 +119,8 @@ export function ReporteInventario({ puedeImportar }: { puedeImportar: boolean })
                 <td className="p-3 text-right">
                   {f.bajaExistencia ? <Badge variante="peligro">{f.existencia}</Badge> : f.existencia}
                 </td>
+                <td className="p-3 text-right text-texto-suave">{f.precioMayoreo ? formatearMoneda(f.precioMayoreo) : "—"}</td>
+                <td className="p-3 text-right text-texto-suave">{f.precioClienteFrecuente ? formatearMoneda(f.precioClienteFrecuente) : "—"}</td>
                 <td className="p-3 text-right">{formatearMoneda(f.valorCosto)}</td>
                 <td className="p-3 text-right font-medium">{formatearMoneda(f.valorVenta)}</td>
               </tr>

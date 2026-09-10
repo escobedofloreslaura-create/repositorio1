@@ -468,6 +468,7 @@ model PosProducto {
   precioCosto    Float    @default(0)
   precioVenta    Float    @default(0)
   precioMayoreo  Float?
+  precioClienteFrecuente Float?
   activo         Boolean  @default(true)
   creadoEn       DateTime @default(now())
   actualizadoEn  DateTime @updatedAt

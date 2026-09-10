@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
   try {
     const sesion = await requerirAdminGeneral();
     const body = await req.json();
-    const { nombre, codigoBarras, departamentoId, unidad, precioCosto, precioVenta, precioMayoreo, existencia, existenciaMinima } = body;
+    const { nombre, codigoBarras, departamentoId, unidad, precioCosto, precioVenta, precioMayoreo, precioClienteFrecuente, existencia, existenciaMinima } = body;
 
     if (!nombre || !departamentoId) {
       return NextResponse.json({ ok: false, error: "Nombre y departamento son requeridos" }, { status: 400 });
@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
           precioCosto: Number(precioCosto) || 0,
           precioVenta: Number(precioVenta) || 0,
           precioMayoreo: precioMayoreo ? Number(precioMayoreo) : null,
+          precioClienteFrecuente: precioClienteFrecuente ? Number(precioClienteFrecuente) : null,
         },
       });
 

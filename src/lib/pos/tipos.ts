@@ -23,6 +23,7 @@ export interface PosProductoT {
   precioCosto?: number;
   precioVenta: number;
   precioMayoreo: number | null;
+  precioClienteFrecuente: number | null;
   existencia: number;
   existenciaMinima: number;
   existenciasPorSucursal?: { sucursalId: string; sucursalNombre: string; existencia: number }[];

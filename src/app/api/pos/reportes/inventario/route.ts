@@ -32,6 +32,8 @@ export async function GET() {
       bajaExistencia: e.existencia <= e.existenciaMinima,
       precioCosto: e.producto.precioCosto,
       precioVenta: e.producto.precioVenta,
+      precioMayoreo: e.producto.precioMayoreo,
+      precioClienteFrecuente: e.producto.precioClienteFrecuente,
       valorCosto: e.existencia * e.producto.precioCosto,
       valorVenta: e.existencia * e.producto.precioVenta,
     }));

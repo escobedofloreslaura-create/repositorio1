@@ -10,7 +10,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     await requerirAdminGeneral();
     const { id } = await params;
     const body = await req.json();
-    const { nombre, codigoBarras, departamentoId, unidad, precioCosto, precioVenta, precioMayoreo, activo } = body;
+    const { nombre, codigoBarras, departamentoId, unidad, precioCosto, precioVenta, precioMayoreo, precioClienteFrecuente, activo } = body;
 
     const producto = await prisma.posProducto.update({
       where: { id },
@@ -22,6 +22,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         ...(precioCosto !== undefined ? { precioCosto: Number(precioCosto) } : {}),
         ...(precioVenta !== undefined ? { precioVenta: Number(precioVenta) } : {}),
         ...(precioMayoreo !== undefined ? { precioMayoreo: precioMayoreo === null || precioMayoreo === "" ? null : Number(precioMayoreo) } : {}),
+        ...(precioClienteFrecuente !== undefined
+          ? { precioClienteFrecuente: precioClienteFrecuente === null || precioClienteFrecuente === "" ? null : Number(precioClienteFrecuente) }
+          : {}),
         ...(activo !== undefined ? { activo } : {}),
       },
       include: { departamento: true },

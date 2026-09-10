@@ -29,6 +29,7 @@ export function ModalProducto({
     precioCosto: producto?.precioCosto?.toString() ?? "",
     precioVenta: producto?.precioVenta?.toString() ?? "",
     precioMayoreo: producto?.precioMayoreo?.toString() ?? "",
+    precioClienteFrecuente: producto?.precioClienteFrecuente?.toString() ?? "",
     existencia: "",
     existenciaMinima: producto?.existenciaMinima?.toString() ?? "5",
   });
@@ -52,6 +53,7 @@ export function ModalProducto({
       precioCosto: form.precioCosto,
       precioVenta: form.precioVenta,
       precioMayoreo: form.precioMayoreo || null,
+      precioClienteFrecuente: form.precioClienteFrecuente || null,
       ...(producto ? {} : { existencia: form.existencia, existenciaMinima: form.existenciaMinima }),
     };
 
@@ -98,10 +100,19 @@ export function ModalProducto({
           opciones={[{ valor: "PIEZA", etiqueta: "Pieza" }, { valor: "CAJA", etiqueta: "Caja" }]}
         />
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Campo label="Precio costo" type="number" min={0} step="0.01" required value={form.precioCosto} onChange={(e) => set("precioCosto", e.target.value)} />
           <Campo label="Precio venta" type="number" min={0} step="0.01" required value={form.precioVenta} onChange={(e) => set("precioVenta", e.target.value)} />
           <Campo label="Precio mayoreo" type="number" min={0} step="0.01" value={form.precioMayoreo} onChange={(e) => set("precioMayoreo", e.target.value)} placeholder="Opcional" />
+          <Campo
+            label="Precio cliente frecuente"
+            type="number"
+            min={0}
+            step="0.01"
+            value={form.precioClienteFrecuente}
+            onChange={(e) => set("precioClienteFrecuente", e.target.value)}
+            placeholder="Opcional"
+          />
         </div>
 
         {!producto && (

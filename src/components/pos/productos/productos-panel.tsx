@@ -121,6 +121,7 @@ export function ProductosPanel({
                 {esAdmin && <th className="p-3 font-medium text-right">Costo</th>}
                 <th className="p-3 font-medium text-right">Venta</th>
                 <th className="p-3 font-medium text-right">Mayoreo</th>
+                <th className="p-3 font-medium text-right">Cliente frecuente</th>
                 <th className="p-3 font-medium text-right">Existencia</th>
                 {(puedeEditarCatalogo || puedeAjustarInventario || puedeRegistrarEntrada) && (
                   <th className="p-3 font-medium text-right">Acciones</th>
@@ -138,6 +139,7 @@ export function ProductosPanel({
                   {esAdmin && <td className="p-3 text-right">{formatearMoneda(p.precioCosto ?? 0)}</td>}
                   <td className="p-3 text-right font-medium">{formatearMoneda(p.precioVenta)}</td>
                   <td className="p-3 text-right text-texto-suave">{p.precioMayoreo ? formatearMoneda(p.precioMayoreo) : "—"}</td>
+                  <td className="p-3 text-right text-texto-suave">{p.precioClienteFrecuente ? formatearMoneda(p.precioClienteFrecuente) : "—"}</td>
                   <td className="p-3 text-right">
                     <Badge variante={p.existencia <= p.existenciaMinima ? "peligro" : "exito"}>{p.existencia}</Badge>
                   </td>

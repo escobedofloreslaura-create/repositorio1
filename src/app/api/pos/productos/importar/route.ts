@@ -14,6 +14,7 @@ interface FilaImportada {
   precioCosto?: string | number;
   precioVenta?: string | number;
   precioMayoreo?: string | number;
+  precioClienteFrecuente?: string | number;
   existencia?: string | number;
   existenciaMinima?: string | number;
 }
@@ -37,6 +38,9 @@ function normalizarClave(clave: string): string {
     "precio venta": "precioVenta",
     "preciomayoreo": "precioMayoreo",
     "precio mayoreo": "precioMayoreo",
+    "precioclientefrecuente": "precioClienteFrecuente",
+    "precio cliente frecuente": "precioClienteFrecuente",
+    "cliente frecuente": "precioClienteFrecuente",
     "existencia": "existencia",
     "existenciaminima": "existenciaMinima",
     "existencia minima": "existenciaMinima",
@@ -113,6 +117,7 @@ export async function POST(req: NextRequest) {
       const tieneCosto = fila.precioCosto !== undefined && String(fila.precioCosto).trim() !== "";
       const tieneVenta = fila.precioVenta !== undefined && String(fila.precioVenta).trim() !== "";
       const tieneMayoreo = fila.precioMayoreo !== undefined && String(fila.precioMayoreo).trim() !== "";
+      const tieneClienteFrecuente = fila.precioClienteFrecuente !== undefined && String(fila.precioClienteFrecuente).trim() !== "";
       const tieneUnidad = fila.unidad !== undefined && String(fila.unidad).trim() !== "";
       const tieneExistenciaMinima = fila.existenciaMinima !== undefined && String(fila.existenciaMinima).trim() !== "";
       const tieneExistencia = fila.existencia !== undefined && String(fila.existencia).trim() !== "";
@@ -139,6 +144,7 @@ export async function POST(req: NextRequest) {
                 ...(tieneCosto ? { precioCosto: Number(fila.precioCosto) || 0 } : {}),
                 ...(tieneVenta ? { precioVenta: Number(fila.precioVenta) || 0 } : {}),
                 ...(tieneMayoreo ? { precioMayoreo: Number(fila.precioMayoreo) } : {}),
+                ...(tieneClienteFrecuente ? { precioClienteFrecuente: Number(fila.precioClienteFrecuente) } : {}),
               },
             });
           } else {
@@ -153,6 +159,7 @@ export async function POST(req: NextRequest) {
                   precioCosto: Number(fila.precioCosto) || 0,
                   precioVenta: Number(fila.precioVenta) || 0,
                   precioMayoreo: tieneMayoreo ? Number(fila.precioMayoreo) : null,
+                  precioClienteFrecuente: tieneClienteFrecuente ? Number(fila.precioClienteFrecuente) : null,
                 },
               })
             ).id;
