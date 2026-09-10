@@ -12,6 +12,7 @@ interface ItemEntrada {
   cantidad: number;
   precioUnitario: number;
   esMayoreo?: boolean;
+  esClienteFrecuente?: boolean;
 }
 
 interface PagoEntrada {
@@ -159,6 +160,7 @@ export async function POST(req: NextRequest) {
             precioUnitario: item.precioUnitario,
             costoUnitario,
             esMayoreo: !!item.esMayoreo,
+            esClienteFrecuente: !!item.esClienteFrecuente,
             subtotal: item.cantidad * item.precioUnitario,
           },
         });

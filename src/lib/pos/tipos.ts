@@ -49,6 +49,8 @@ export interface ItemTicket {
   precioNormal: number;
   precioMayoreo: number | null;
   esMayoreo: boolean;
+  precioClienteFrecuente: number | null;
+  esClienteFrecuente: boolean;
   existenciaDisponible: number | null;
 }
 

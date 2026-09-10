@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, X, Trash2, Tags, PackagePlus, Wallet, Receipt } from "lucide-react";
+import { Plus, X, Trash2, Tags, Star, PackagePlus, Wallet, Receipt } from "lucide-react";
 import { Boton } from "@/components/ui/boton";
 import { Badge } from "@/components/ui/badge";
 import { formatearMoneda } from "@/lib/formato";
@@ -114,7 +114,7 @@ export function PantallaVentas() {
   function agregarProducto(producto: PosProductoT) {
     if (!ticketActivo) return;
     actualizarTicket(ticketActivo.id, (t) => {
-      const existente = t.items.find((i) => i.productoId === producto.id && !i.esMayoreo);
+      const existente = t.items.find((i) => i.productoId === producto.id && !i.esMayoreo && !i.esClienteFrecuente);
       if (existente) {
         return {
           ...t,
@@ -130,6 +130,8 @@ export function PantallaVentas() {
         precioNormal: producto.precioVenta,
         precioMayoreo: producto.precioMayoreo,
         esMayoreo: false,
+        precioClienteFrecuente: producto.precioClienteFrecuente,
+        esClienteFrecuente: false,
         existenciaDisponible: producto.existencia,
       };
       return { ...t, items: [...t.items, item] };
@@ -147,6 +149,8 @@ export function PantallaVentas() {
       precioNormal: monto,
       precioMayoreo: null,
       esMayoreo: false,
+      precioClienteFrecuente: null,
+      esClienteFrecuente: false,
       existenciaDisponible: null,
     };
     actualizarTicket(ticketActivo.id, (t) => ({ ...t, items: [...t.items, item] }));
@@ -161,14 +165,24 @@ export function PantallaVentas() {
     }));
   }
 
-  function alternarMayoreo(clave: string) {
+  // Mayoreo y cliente frecuente son excluyentes entre sí: activar uno
+  // desactiva el otro y vuelve a calcular el precio unitario de la línea.
+  function alternarPrecioEspecial(clave: string, tipo: "MAYOREO" | "CLIENTE_FRECUENTE") {
     if (!ticketActivo) return;
     actualizarTicket(ticketActivo.id, (t) => ({
       ...t,
       items: t.items.map((i) => {
-        if (i.claveLocal !== clave || i.precioMayoreo === null) return i;
-        const esMayoreo = !i.esMayoreo;
-        return { ...i, esMayoreo, precioUnitario: esMayoreo ? i.precioMayoreo! : i.precioNormal };
+        if (i.claveLocal !== clave) return i;
+        // "!= null" (no estricto) también cubre carritos guardados en el
+        // navegador antes de que este campo existiera (queda undefined).
+        if (tipo === "MAYOREO") {
+          if (i.precioMayoreo == null) return i;
+          const esMayoreo = !i.esMayoreo;
+          return { ...i, esMayoreo, esClienteFrecuente: false, precioUnitario: esMayoreo ? i.precioMayoreo! : i.precioNormal };
+        }
+        if (i.precioClienteFrecuente == null) return i;
+        const esClienteFrecuente = !i.esClienteFrecuente;
+        return { ...i, esClienteFrecuente, esMayoreo: false, precioUnitario: esClienteFrecuente ? i.precioClienteFrecuente! : i.precioNormal };
       }),
     }));
   }
@@ -197,6 +211,7 @@ export function PantallaVentas() {
             cantidad: i.cantidad,
             precioUnitario: i.precioUnitario,
             esMayoreo: i.esMayoreo,
+            esClienteFrecuente: i.esClienteFrecuente,
           })),
           pagos,
         }),
@@ -342,15 +357,26 @@ export function PantallaVentas() {
                       +
                     </button>
                   </div>
-                  {item.precioMayoreo !== null && (
+                  {item.precioMayoreo != null && (
                     <button
-                      onClick={() => alternarMayoreo(item.claveLocal)}
+                      onClick={() => alternarPrecioEspecial(item.claveLocal, "MAYOREO")}
                       className={cn(
                         "flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg border",
                         item.esMayoreo ? "bg-marca text-white border-marca" : "border-borde text-texto-suave hover:bg-surface-hover"
                       )}
                     >
                       <Tags className="h-3 w-3" /> Mayoreo
+                    </button>
+                  )}
+                  {item.precioClienteFrecuente != null && (
+                    <button
+                      onClick={() => alternarPrecioEspecial(item.claveLocal, "CLIENTE_FRECUENTE")}
+                      className={cn(
+                        "flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg border",
+                        item.esClienteFrecuente ? "bg-marca text-white border-marca" : "border-borde text-texto-suave hover:bg-surface-hover"
+                      )}
+                    >
+                      <Star className="h-3 w-3" /> Cliente frecuente
                     </button>
                   )}
                   <span className="text-sm font-semibold text-texto ml-auto">{formatearMoneda(item.cantidad * item.precioUnitario)}</span>

@@ -658,6 +658,7 @@ model PosDetalleVenta {
   precioUnitario   Float
   costoUnitario    Float   @default(0)
   esMayoreo        Boolean @default(false)
+  esClienteFrecuente Boolean @default(false)
   subtotal         Float
   cantidadDevuelta Float   @default(0)
 
