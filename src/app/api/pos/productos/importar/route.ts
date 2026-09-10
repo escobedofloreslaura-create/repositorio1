@@ -106,12 +106,20 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const precioCosto = Number(fila.precioCosto) || 0;
-      const precioVenta = Number(fila.precioVenta) || 0;
-      const precioMayoreo = fila.precioMayoreo ? Number(fila.precioMayoreo) : null;
-      const existenciaMinima = fila.existenciaMinima !== undefined && fila.existenciaMinima !== "" ? Number(fila.existenciaMinima) : 5;
-      const existencia = Number(fila.existencia) || 0;
-      const unidad = String(fila.unidad ?? "PIEZA").trim().toUpperCase() === "CAJA" ? "CAJA" : "PIEZA";
+      // Las columnas de precio, unidad y existencia mínima son opcionales al
+      // actualizar un producto existente (por ejemplo, un archivo que solo
+      // trae el conteo físico de inventario): si no vienen en la fila, no se
+      // tocan. Para un producto nuevo sí se requieren costo y venta.
+      const tieneCosto = fila.precioCosto !== undefined && String(fila.precioCosto).trim() !== "";
+      const tieneVenta = fila.precioVenta !== undefined && String(fila.precioVenta).trim() !== "";
+      const tieneMayoreo = fila.precioMayoreo !== undefined && String(fila.precioMayoreo).trim() !== "";
+      const tieneUnidad = fila.unidad !== undefined && String(fila.unidad).trim() !== "";
+      const tieneExistenciaMinima = fila.existenciaMinima !== undefined && String(fila.existenciaMinima).trim() !== "";
+      const tieneExistencia = fila.existencia !== undefined && String(fila.existencia).trim() !== "";
+
+      const unidad = tieneUnidad ? (String(fila.unidad).trim().toUpperCase() === "CAJA" ? "CAJA" : "PIEZA") : undefined;
+      const existenciaMinima = tieneExistenciaMinima ? Number(fila.existenciaMinima) : undefined;
+      const existencia = tieneExistencia ? Number(fila.existencia) || 0 : undefined;
 
       try {
         await prisma.$transaction(async (tx) => {
@@ -119,44 +127,66 @@ export async function POST(req: NextRequest) {
             ? await tx.posProducto.findUnique({ where: { codigoBarras } })
             : await tx.posProducto.findFirst({ where: { nombre } });
 
-          const productoId = existente
-            ? existente.id
-            : (
-                await tx.posProducto.create({
-                  data: { nombre, codigoBarras, departamentoId: departamento.id, unidad, precioCosto, precioVenta, precioMayoreo },
-                })
-              ).id;
-
+          let productoId: string;
           if (existente) {
+            productoId = existente.id;
             await tx.posProducto.update({
               where: { id: existente.id },
-              data: { nombre, departamentoId: departamento.id, unidad, precioCosto, precioVenta, precioMayoreo },
+              data: {
+                nombre,
+                departamentoId: departamento.id,
+                ...(unidad ? { unidad } : {}),
+                ...(tieneCosto ? { precioCosto: Number(fila.precioCosto) || 0 } : {}),
+                ...(tieneVenta ? { precioVenta: Number(fila.precioVenta) || 0 } : {}),
+                ...(tieneMayoreo ? { precioMayoreo: Number(fila.precioMayoreo) } : {}),
+              },
             });
+          } else {
+            if (!tieneCosto || !tieneVenta) throw new Error("FALTAN_PRECIOS");
+            productoId = (
+              await tx.posProducto.create({
+                data: {
+                  nombre,
+                  codigoBarras,
+                  departamentoId: departamento.id,
+                  unidad: unidad ?? "PIEZA",
+                  precioCosto: Number(fila.precioCosto) || 0,
+                  precioVenta: Number(fila.precioVenta) || 0,
+                  precioMayoreo: tieneMayoreo ? Number(fila.precioMayoreo) : null,
+                },
+              })
+            ).id;
           }
 
           const existenciaActual = await tx.posExistencia.upsert({
             where: { sucursalId_productoId: { sucursalId, productoId } },
-            update: { existenciaMinima },
-            create: { sucursalId, productoId, existenciaMinima },
+            update: existenciaMinima !== undefined ? { existenciaMinima } : {},
+            create: { sucursalId, productoId, existenciaMinima: existenciaMinima ?? 5 },
           });
 
-          const delta = existencia - existenciaActual.existencia;
-          if (delta !== 0) {
-            await registrarMovimientoInventario(tx, {
-              productoId,
-              sucursalId,
-              tipo: existente ? "AJUSTE" : "ENTRADA",
-              delta,
-              detalle: existente ? "Ajuste por importación masiva de catálogo" : "Existencia inicial por importación masiva de catálogo",
-              usuarioId: sesion.id,
-            });
+          if (existencia !== undefined) {
+            const delta = existencia - existenciaActual.existencia;
+            if (delta !== 0) {
+              await registrarMovimientoInventario(tx, {
+                productoId,
+                sucursalId,
+                tipo: existente ? "AJUSTE" : "ENTRADA",
+                delta,
+                detalle: existente ? "Ajuste por importación masiva de inventario" : "Existencia inicial por importación masiva de inventario",
+                usuarioId: sesion.id,
+              });
+            }
           }
 
           if (existente) actualizados++;
           else creados++;
         });
-      } catch {
-        errores.push(`Fila ${i + 2}: no se pudo guardar "${nombre}"`);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FALTAN_PRECIOS") {
+          errores.push(`Fila ${i + 2}: "${nombre}" es un producto nuevo y le falta precio costo o precio venta`);
+        } else {
+          errores.push(`Fila ${i + 2}: no se pudo guardar "${nombre}"`);
+        }
       }
     }
 
