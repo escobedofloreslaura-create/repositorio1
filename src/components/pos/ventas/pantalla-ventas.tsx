@@ -44,6 +44,13 @@ export function PantallaVentas() {
   const [versionCatalogo, setVersionCatalogo] = useState(0);
   const [config, setConfig] = useState<ConfigTicket | null>(null);
   const [sesionNombre, setSesionNombre] = useState("");
+  const [avisoStock, setAvisoStock] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!avisoStock) return;
+    const t = setTimeout(() => setAvisoStock(null), 5000);
+    return () => clearTimeout(t);
+  }, [avisoStock]);
 
   useEffect(() => {
     cargarTurno();
@@ -115,10 +122,12 @@ export function PantallaVentas() {
 
   // Si el producto tiene existencia registrada (existenciaDisponible no es
   // null) y la cantidad pedida la rebasa, avisa y la limita a lo disponible
-  // en vez de dejar capturar de más sin que el cajero se entere.
+  // en vez de dejar capturar de más sin que el cajero se entere. El aviso se
+  // muestra como un letrero grande al centro del carrito (no un toast chico)
+  // para que sea imposible pasarlo por alto.
   function limitarACantidadDisponible(item: ItemTicket, cantidadDeseada: number): number {
     if (item.existenciaDisponible !== null && cantidadDeseada > item.existenciaDisponible) {
-      toast.error(
+      setAvisoStock(
         `Inventario insuficiente: solo hay ${item.existenciaDisponible} ${item.existenciaDisponible === 1 ? "pieza disponible" : "piezas disponibles"} de "${item.nombre}" en esta sucursal.`
       );
       return item.existenciaDisponible;
@@ -301,7 +310,23 @@ export function PantallaVentas() {
         }}
       />
 
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col min-h-0 relative">
+        {avisoStock && (
+          <div className="absolute inset-x-4 top-1/3 z-20 flex justify-center pointer-events-none">
+            <div
+              role="alert"
+              className="pointer-events-auto max-w-md rounded-2xl border-2 border-peligro bg-white shadow-lg px-6 py-5 text-center"
+            >
+              <p className="text-xl font-bold text-peligro leading-snug">{avisoStock}</p>
+              <button
+                onClick={() => setAvisoStock(null)}
+                className="mt-3 text-sm font-medium text-texto-suave hover:text-texto underline"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-1 border-b border-borde px-3 pt-3 overflow-x-auto">
           {tickets.map((t) => (
             <button
