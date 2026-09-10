@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requerirAdminPos, obtenerSucursalActiva } from "@/lib/pos/auth";
+import { requerirSesionPos, obtenerSucursalActiva } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 import { registrarMovimientoInventario } from "@/lib/pos/kardex";
 
 // Entradas / salidas / ajustes manuales de inventario (Kardex), en la
 // sucursal en la que el usuario está operando. Un administrador de tienda
 // puede ajustar el inventario de SU tienda; el Administrador General, el de
-// la sucursal que tenga elegida.
+// la sucursal que tenga elegida. Un cajero solo puede registrar ENTRADAS
+// (recibir mercancía de un proveedor) y no puede tocar la existencia mínima.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const sesion = await requerirAdminPos();
+    const sesion = await requerirSesionPos();
     const { id } = await params;
     const body = await req.json();
     const { tipo, cantidad, nuevaExistencia, existenciaMinima, detalle } = body as {
@@ -26,6 +27,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (tipo && !["ENTRADA", "SALIDA", "AJUSTE"].includes(tipo)) {
       return NextResponse.json({ ok: false, error: "Tipo de movimiento inválido" }, { status: 400 });
+    }
+
+    if (sesion.rol !== "ADMINISTRADOR") {
+      if (tipo !== "ENTRADA") {
+        return NextResponse.json({ ok: false, error: "Solo puedes registrar entradas de mercancía" }, { status: 403 });
+      }
+      if (existenciaMinima !== undefined) {
+        return NextResponse.json({ ok: false, error: "No puedes modificar la existencia mínima" }, { status: 403 });
+      }
     }
 
     const existenciaResultado = await prisma.$transaction(async (tx) => {

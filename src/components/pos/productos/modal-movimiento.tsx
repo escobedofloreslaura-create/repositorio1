@@ -6,7 +6,18 @@ import { Boton } from "@/components/ui/boton";
 import toast from "react-hot-toast";
 import type { PosProductoT } from "@/lib/pos/tipos";
 
-export function ModalMovimiento({ producto, onCerrar, onRegistrado }: { producto: PosProductoT; onCerrar: () => void; onRegistrado: () => void }) {
+export function ModalMovimiento({
+  producto,
+  soloEntrada = false,
+  onCerrar,
+  onRegistrado,
+}: {
+  producto: PosProductoT;
+  /** El cajero solo puede recibir mercancía de un proveedor: sin salidas, ajustes, ni existencia mínima. */
+  soloEntrada?: boolean;
+  onCerrar: () => void;
+  onRegistrado: () => void;
+}) {
   const [tipo, setTipo] = useState<"ENTRADA" | "SALIDA" | "AJUSTE">("ENTRADA");
   const [cantidad, setCantidad] = useState("");
   const [nuevaExistencia, setNuevaExistencia] = useState(producto.existencia.toString());
@@ -41,19 +52,23 @@ export function ModalMovimiento({ producto, onCerrar, onRegistrado }: { producto
   }
 
   return (
-    <Modal abierto onCerrar={onCerrar} titulo={`Movimiento de inventario · ${producto.nombre}`}>
+    <Modal abierto onCerrar={onCerrar} titulo={soloEntrada ? `Entrada de mercancía · ${producto.nombre}` : `Movimiento de inventario · ${producto.nombre}`}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="text-sm text-texto-suave">Existencia actual: <strong>{producto.existencia}</strong></p>
-        <Select
-          label="Tipo de movimiento"
-          value={tipo}
-          onChange={(e) => setTipo(e.target.value as typeof tipo)}
-          opciones={[
-            { valor: "ENTRADA", etiqueta: "Entrada (compra / reabasto)" },
-            { valor: "SALIDA", etiqueta: "Salida (merma / uso interno)" },
-            { valor: "AJUSTE", etiqueta: "Ajuste a una existencia exacta" },
-          ]}
-        />
+        {soloEntrada ? (
+          <p className="text-sm text-texto">Registra la cantidad que acabas de recibir del proveedor.</p>
+        ) : (
+          <Select
+            label="Tipo de movimiento"
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value as typeof tipo)}
+            opciones={[
+              { valor: "ENTRADA", etiqueta: "Entrada (compra / reabasto)" },
+              { valor: "SALIDA", etiqueta: "Salida (merma / uso interno)" },
+              { valor: "AJUSTE", etiqueta: "Ajuste a una existencia exacta" },
+            ]}
+          />
+        )}
         {tipo === "AJUSTE" ? (
           <Campo label="Nueva existencia" type="number" min={0} required value={nuevaExistencia} onChange={(e) => setNuevaExistencia(e.target.value)} autoFocus />
         ) : (

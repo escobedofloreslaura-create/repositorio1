@@ -7,6 +7,7 @@ export default async function ProductosPage() {
     <ProductosPanel
       puedeEditarCatalogo={!!sesion && esAdminGeneral(sesion)}
       puedeAjustarInventario={sesion?.rol === "ADMINISTRADOR"}
+      puedeRegistrarEntrada={sesion?.rol === "CAJERO"}
       esAdmin={sesion?.rol === "ADMINISTRADOR"}
     />
   );

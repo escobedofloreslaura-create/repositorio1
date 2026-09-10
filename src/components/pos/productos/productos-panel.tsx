@@ -16,12 +16,15 @@ import type { PosProductoT, PosDepartamentoT } from "@/lib/pos/tipos";
 export function ProductosPanel({
   puedeEditarCatalogo,
   puedeAjustarInventario,
+  puedeRegistrarEntrada,
   esAdmin,
 }: {
   /** Nombre, precios, alta/baja del producto: solo el Administrador General (catálogo único de la cadena). */
   puedeEditarCatalogo: boolean;
   /** Entradas/salidas/ajustes de existencia en la sucursal activa: cualquier administrador. */
   puedeAjustarInventario: boolean;
+  /** Un cajero puede recibir mercancía de un proveedor (solo entradas), sin editar el catálogo. */
+  puedeRegistrarEntrada: boolean;
   /** El precio de costo es confidencial: solo lo ve un administrador. */
   esAdmin: boolean;
 }) {
@@ -119,7 +122,9 @@ export function ProductosPanel({
                 <th className="p-3 font-medium text-right">Venta</th>
                 <th className="p-3 font-medium text-right">Mayoreo</th>
                 <th className="p-3 font-medium text-right">Existencia</th>
-                {(puedeEditarCatalogo || puedeAjustarInventario) && <th className="p-3 font-medium text-right">Acciones</th>}
+                {(puedeEditarCatalogo || puedeAjustarInventario || puedeRegistrarEntrada) && (
+                  <th className="p-3 font-medium text-right">Acciones</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -136,11 +141,15 @@ export function ProductosPanel({
                   <td className="p-3 text-right">
                     <Badge variante={p.existencia <= p.existenciaMinima ? "peligro" : "exito"}>{p.existencia}</Badge>
                   </td>
-                  {(puedeEditarCatalogo || puedeAjustarInventario) && (
+                  {(puedeEditarCatalogo || puedeAjustarInventario || puedeRegistrarEntrada) && (
                     <td className="p-3">
                       <div className="flex justify-end gap-1">
-                        {puedeAjustarInventario && (
-                          <button onClick={() => setModalMovimiento(p)} className="p-1.5 rounded-lg hover:bg-surface-hover text-texto-suave" title="Movimiento de inventario">
+                        {(puedeAjustarInventario || puedeRegistrarEntrada) && (
+                          <button
+                            onClick={() => setModalMovimiento(p)}
+                            className="p-1.5 rounded-lg hover:bg-surface-hover text-texto-suave"
+                            title={puedeAjustarInventario ? "Movimiento de inventario" : "Registrar entrada de mercancía"}
+                          >
                             <ArrowLeftRight className="h-4 w-4" />
                           </button>
                         )}
@@ -178,7 +187,12 @@ export function ProductosPanel({
         />
       )}
       {modalMovimiento && (
-        <ModalMovimiento producto={modalMovimiento} onCerrar={() => setModalMovimiento(null)} onRegistrado={() => { setModalMovimiento(null); cargar(); }} />
+        <ModalMovimiento
+          producto={modalMovimiento}
+          soloEntrada={!puedeAjustarInventario}
+          onCerrar={() => setModalMovimiento(null)}
+          onRegistrado={() => { setModalMovimiento(null); cargar(); }}
+        />
       )}
       {modalImportar && (
         <ModalImportar onCerrar={() => setModalImportar(false)} onImportado={cargar} />
