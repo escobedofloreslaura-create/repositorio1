@@ -113,16 +113,31 @@ export function PantallaVentas() {
     }
   }
 
+  // Si el producto tiene existencia registrada (existenciaDisponible no es
+  // null) y la cantidad pedida la rebasa, avisa y la limita a lo disponible
+  // en vez de dejar capturar de más sin que el cajero se entere.
+  function limitarACantidadDisponible(item: ItemTicket, cantidadDeseada: number): number {
+    if (item.existenciaDisponible !== null && cantidadDeseada > item.existenciaDisponible) {
+      toast.error(
+        `Inventario insuficiente: solo hay ${item.existenciaDisponible} ${item.existenciaDisponible === 1 ? "pieza disponible" : "piezas disponibles"} de "${item.nombre}" en esta sucursal.`
+      );
+      return item.existenciaDisponible;
+    }
+    return cantidadDeseada;
+  }
+
   function agregarProducto(producto: PosProductoT) {
     if (!ticketActivo) return;
+    const existente = ticketActivo.items.find((i) => i.productoId === producto.id && !i.esMayoreo && !i.esClienteFrecuente);
+    if (existente) {
+      const nuevaCantidad = limitarACantidadDisponible(existente, existente.cantidad + 1);
+      actualizarTicket(ticketActivo.id, (t) => ({
+        ...t,
+        items: t.items.map((i) => (i.claveLocal === existente.claveLocal ? { ...i, cantidad: nuevaCantidad } : i)),
+      }));
+      return;
+    }
     actualizarTicket(ticketActivo.id, (t) => {
-      const existente = t.items.find((i) => i.productoId === producto.id && !i.esMayoreo && !i.esClienteFrecuente);
-      if (existente) {
-        return {
-          ...t,
-          items: t.items.map((i) => (i === existente ? { ...i, cantidad: i.cantidad + 1 } : i)),
-        };
-      }
       const item: ItemTicket = {
         claveLocal: crypto.randomUUID(),
         productoId: producto.id,
@@ -161,9 +176,12 @@ export function PantallaVentas() {
 
   function cambiarCantidad(clave: string, cantidad: number) {
     if (!ticketActivo || cantidad <= 0) return;
+    const item = ticketActivo.items.find((i) => i.claveLocal === clave);
+    if (!item) return;
+    const cantidadFinal = limitarACantidadDisponible(item, cantidad);
     actualizarTicket(ticketActivo.id, (t) => ({
       ...t,
-      items: t.items.map((i) => (i.claveLocal === clave ? { ...i, cantidad } : i)),
+      items: t.items.map((i) => (i.claveLocal === clave ? { ...i, cantidad: cantidadFinal } : i)),
     }));
   }
 
