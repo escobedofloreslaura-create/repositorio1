@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requerirSesionPos, requerirAdminGeneral, obtenerSucursalActiva, esAdminGeneral } from "@/lib/pos/auth";
+import { requerirSesionPos, requerirAdminGeneral, obtenerSucursalActiva } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 import { registrarMovimientoInventario } from "@/lib/pos/kardex";
 
@@ -14,7 +14,11 @@ export async function GET(req: NextRequest) {
     const departamentoId = searchParams.get("departamentoId");
     const bajaExistencia = searchParams.get("bajaExistencia") === "1";
     const soloActivos = searchParams.get("todos") !== "1";
-    const todasSucursales = searchParams.get("todasSucursales") === "1" && esAdminGeneral(sesion);
+    // El desglose de existencia por sucursal es solo cantidades (sin costo ni
+    // ganancia), así que cualquier sesión puede consultarlo —incluye al
+    // cajero, para saber si otra sucursal tiene piezas cuando a la suya no
+    // le alcanzan para una venta.
+    const todasSucursales = searchParams.get("todasSucursales") === "1";
 
     const sucursalId = await obtenerSucursalActiva(sesion);
 
@@ -54,6 +58,7 @@ export async function GET(req: NextRequest) {
             sucursalId: e.sucursalId,
             sucursalNombre: (e as unknown as { sucursal: { nombre: string } }).sucursal.nombre,
             existencia: e.existencia,
+            esPropia: e.sucursalId === sucursalId,
           })),
         };
       }

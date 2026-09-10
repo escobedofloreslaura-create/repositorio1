@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, X, Trash2, Tags, Star, PackagePlus, Wallet, Receipt } from "lucide-react";
+import { Plus, X, Trash2, Tags, Star, PackagePlus, Wallet, Receipt, Store } from "lucide-react";
 import { Boton } from "@/components/ui/boton";
 import { Badge } from "@/components/ui/badge";
 import { formatearMoneda } from "@/lib/formato";
@@ -11,6 +11,7 @@ import { ModalAperturaCaja } from "./modal-apertura-caja";
 import { ModalSalidaCaja } from "./modal-salida-caja";
 import { ModalProductoComun } from "./modal-producto-comun";
 import { ModalCobro } from "./modal-cobro";
+import { ModalExistenciasSucursales } from "./modal-existencias-sucursales";
 import { imprimirTicketAutomatico } from "@/lib/pos/imprimir-ticket";
 import type { PosProductoT, ItemTicket, Ticket } from "@/lib/pos/tipos";
 import type { FormaPago } from "@/lib/pos/constantes";
@@ -37,6 +38,7 @@ export function PantallaVentas() {
   const [ticketActivoId, setTicketActivoId] = useState<string>("");
   const [modalProductoComun, setModalProductoComun] = useState(false);
   const [modalSalida, setModalSalida] = useState(false);
+  const [modalExistencias, setModalExistencias] = useState(false);
   const [modalCobro, setModalCobro] = useState(false);
   const [procesandoCobro, setProcesandoCobro] = useState(false);
   const [versionCatalogo, setVersionCatalogo] = useState(0);
@@ -314,8 +316,14 @@ export function PantallaVentas() {
         <div className="flex items-center gap-2 px-4 py-2 border-b border-borde">
           <Badge variante="exito">Caja abierta · fondo {formatearMoneda(turno.fondoInicial)}</Badge>
           <button
+            onClick={() => setModalExistencias(true)}
+            className="ml-auto flex items-center gap-1 text-xs font-medium text-texto-suave hover:text-marca"
+          >
+            <Store className="h-3.5 w-3.5" /> Existencias en otras sucursales
+          </button>
+          <button
             onClick={() => setModalSalida(true)}
-            className="ml-auto flex items-center gap-1 text-xs font-medium text-texto-suave hover:text-peligro"
+            className="flex items-center gap-1 text-xs font-medium text-texto-suave hover:text-peligro"
           >
             <Wallet className="h-3.5 w-3.5" /> Salida de dinero
           </button>
@@ -415,6 +423,7 @@ export function PantallaVentas() {
       {modalCobro && (
         <ModalCobro total={total} onCerrar={() => setModalCobro(false)} onConfirmar={confirmarCobro} procesando={procesandoCobro} />
       )}
+      {modalExistencias && <ModalExistenciasSucursales onCerrar={() => setModalExistencias(false)} />}
     </div>
   );
 }

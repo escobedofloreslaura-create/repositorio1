@@ -26,7 +26,7 @@ export interface PosProductoT {
   precioClienteFrecuente: number | null;
   existencia: number;
   existenciaMinima: number;
-  existenciasPorSucursal?: { sucursalId: string; sucursalNombre: string; existencia: number }[];
+  existenciasPorSucursal?: { sucursalId: string; sucursalNombre: string; existencia: number; esPropia: boolean }[];
   activo: boolean;
 }
 
