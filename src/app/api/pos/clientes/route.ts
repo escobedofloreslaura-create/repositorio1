@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const sesion = await requerirSesionPos();
     const sucursalId = await requerirSucursalActiva(sesion);
     const body = await req.json();
-    const { nombre, direccion, telefono, limiteCredito } = body;
+    const { nombre, direccion, telefono, limiteCredito, tipoPrecio } = body;
 
     if (!nombre) {
       return NextResponse.json({ ok: false, error: "El nombre es requerido" }, { status: 400 });
@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
         direccion: direccion || null,
         telefono: telefono || null,
         limiteCredito: Number(limiteCredito) || 0,
+        tipoPrecio: tipoPrecio || "VENTA",
       },
     });
 

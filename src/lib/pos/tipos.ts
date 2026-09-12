@@ -1,3 +1,5 @@
+import type { TipoPrecioCliente } from "./constantes";
+
 export interface PosDepartamentoT {
   id: string;
   nombre: string;
@@ -37,6 +39,8 @@ export interface PosClienteT {
   telefono: string | null;
   limiteCredito: number;
   saldoActual: number;
+  /** Precio que se le aplica en automático al agregarlo a una venta: venta normal, mayoreo o cliente frecuente. */
+  tipoPrecio: TipoPrecioCliente;
   activo: boolean;
 }
 
@@ -82,4 +86,6 @@ export interface Ticket {
   items: ItemTicket[];
   clienteId: string | null;
   clienteNombre: string | null;
+  /** Tipo de precio del cliente asignado a esta cuenta; null cuando es venta al público en general. */
+  clienteTipoPrecio: TipoPrecioCliente | null;
 }

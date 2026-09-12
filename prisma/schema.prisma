@@ -534,6 +534,7 @@ model PosCliente {
   telefono      String?
   limiteCredito Float    @default(0)
   saldoActual   Float    @default(0)
+  tipoPrecio    String   @default("VENTA") // VENTA | MAYOREO | CLIENTE_FRECUENTE
   activo        Boolean  @default(true)
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt

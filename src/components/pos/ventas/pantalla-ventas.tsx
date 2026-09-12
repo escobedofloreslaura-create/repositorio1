@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, X, Trash2, Tags, Star, PackagePlus, Wallet, Receipt, Store } from "lucide-react";
+import { Plus, X, Trash2, Tags, Star, PackagePlus, Wallet, Receipt, Store, UserRound } from "lucide-react";
 import { Boton } from "@/components/ui/boton";
 import { Badge } from "@/components/ui/badge";
 import { formatearMoneda } from "@/lib/formato";
@@ -12,8 +12,9 @@ import { ModalSalidaCaja } from "./modal-salida-caja";
 import { ModalProductoComun } from "./modal-producto-comun";
 import { ModalCobro } from "./modal-cobro";
 import { ModalExistenciasSucursales } from "./modal-existencias-sucursales";
+import { ModalSeleccionarCliente } from "./modal-seleccionar-cliente";
 import { imprimirTicketAutomatico } from "@/lib/pos/imprimir-ticket";
-import type { PosProductoT, ItemTicket, Ticket } from "@/lib/pos/tipos";
+import type { PosProductoT, PosClienteT, ItemTicket, Ticket } from "@/lib/pos/tipos";
 import type { FormaPago } from "@/lib/pos/constantes";
 
 interface ConfigTicket {
@@ -29,7 +30,23 @@ interface ConfigTicket {
 const STORAGE_KEY = "pos_tickets_v1";
 
 function ticketNuevo(numero: number): Ticket {
-  return { id: crypto.randomUUID(), nombre: `Cuenta ${numero}`, items: [], clienteId: null, clienteNombre: null };
+  return { id: crypto.randomUUID(), nombre: `Cuenta ${numero}`, items: [], clienteId: null, clienteNombre: null, clienteTipoPrecio: null };
+}
+
+// Calcula qué precio le corresponde a un producto según el tipo de precio del
+// cliente asignado a la cuenta (o el precio normal si es venta al público en
+// general, o si el cliente no tiene ese precio especial configurado).
+function precioSegunTipoCliente(
+  base: { precioNormal: number; precioMayoreo: number | null; precioClienteFrecuente: number | null },
+  tipoPrecio: Ticket["clienteTipoPrecio"]
+): { precioUnitario: number; esMayoreo: boolean; esClienteFrecuente: boolean } {
+  if (tipoPrecio === "MAYOREO" && base.precioMayoreo != null) {
+    return { precioUnitario: base.precioMayoreo, esMayoreo: true, esClienteFrecuente: false };
+  }
+  if (tipoPrecio === "CLIENTE_FRECUENTE" && base.precioClienteFrecuente != null) {
+    return { precioUnitario: base.precioClienteFrecuente, esMayoreo: false, esClienteFrecuente: true };
+  }
+  return { precioUnitario: base.precioNormal, esMayoreo: false, esClienteFrecuente: false };
 }
 
 export function PantallaVentas() {
@@ -39,6 +56,7 @@ export function PantallaVentas() {
   const [modalProductoComun, setModalProductoComun] = useState(false);
   const [modalSalida, setModalSalida] = useState(false);
   const [modalExistencias, setModalExistencias] = useState(false);
+  const [modalCliente, setModalCliente] = useState(false);
   const [modalCobro, setModalCobro] = useState(false);
   const [procesandoCobro, setProcesandoCobro] = useState(false);
   const [versionCatalogo, setVersionCatalogo] = useState(0);
@@ -147,21 +165,50 @@ export function PantallaVentas() {
       return;
     }
     actualizarTicket(ticketActivo.id, (t) => {
+      const { precioUnitario, esMayoreo, esClienteFrecuente } = precioSegunTipoCliente(
+        { precioNormal: producto.precioVenta, precioMayoreo: producto.precioMayoreo, precioClienteFrecuente: producto.precioClienteFrecuente },
+        t.clienteTipoPrecio
+      );
       const item: ItemTicket = {
         claveLocal: crypto.randomUUID(),
         productoId: producto.id,
         nombre: producto.nombre,
         cantidad: 1,
-        precioUnitario: producto.precioVenta,
+        precioUnitario,
         precioNormal: producto.precioVenta,
         precioMayoreo: producto.precioMayoreo,
-        esMayoreo: false,
+        esMayoreo,
         precioClienteFrecuente: producto.precioClienteFrecuente,
-        esClienteFrecuente: false,
+        esClienteFrecuente,
         existenciaDisponible: producto.existencia,
       };
       return { ...t, items: [...t.items, item] };
     });
+  }
+
+  // Asignar un cliente a la cuenta aplica en automático su precio (mayoreo o
+  // cliente frecuente) a todos los productos ya agregados y a los que se
+  // agreguen después; quitarlo (o "Público en general") regresa todo al
+  // precio normal para no dejar un descuento aplicado sin cliente de por medio.
+  function asignarCliente(cliente: PosClienteT | null) {
+    if (!ticketActivo) return;
+    const tipoPrecio = cliente?.tipoPrecio ?? null;
+    actualizarTicket(ticketActivo.id, (t) => ({
+      ...t,
+      clienteId: cliente?.id ?? null,
+      clienteNombre: cliente?.nombre ?? null,
+      clienteTipoPrecio: tipoPrecio,
+      items: t.items.map((i) => {
+        if (i.productoId === null) return i;
+        const { precioUnitario, esMayoreo, esClienteFrecuente } = precioSegunTipoCliente(
+          { precioNormal: i.precioNormal, precioMayoreo: i.precioMayoreo, precioClienteFrecuente: i.precioClienteFrecuente },
+          tipoPrecio
+        );
+        return { ...i, precioUnitario, esMayoreo, esClienteFrecuente };
+      }),
+    }));
+    setModalCliente(false);
+    toast.success(cliente ? `Cliente asignado: ${cliente.nombre}` : "Cuenta marcada como público en general");
   }
 
   function agregarProductoComun(descripcion: string, monto: number) {
@@ -280,7 +327,7 @@ export function PantallaVentas() {
         });
       }
       if (tickets.length === 1) {
-        actualizarTicket(ticketActivo.id, (t) => ({ ...t, items: [], clienteId: null, clienteNombre: null }));
+        actualizarTicket(ticketActivo.id, (t) => ({ ...t, items: [], clienteId: null, clienteNombre: null, clienteTipoPrecio: null }));
       } else {
         quitarCuentaSinConfirmar(ticketActivo.id);
       }
@@ -356,8 +403,18 @@ export function PantallaVentas() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-borde">
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-borde flex-wrap">
           <Badge variante="exito">Caja abierta · fondo {formatearMoneda(turno.fondoInicial)}</Badge>
+          <button
+            onClick={() => setModalCliente(true)}
+            className={cn(
+              "flex items-center gap-1 text-xs font-medium",
+              ticketActivo?.clienteId ? "text-marca" : "text-texto-suave hover:text-marca"
+            )}
+          >
+            <UserRound className="h-3.5 w-3.5" />
+            {ticketActivo?.clienteId ? ticketActivo.clienteNombre : "Público en general"}
+          </button>
           <button
             onClick={() => setModalExistencias(true)}
             className="ml-auto flex items-center gap-1 text-xs font-medium text-texto-suave hover:text-marca"
@@ -464,9 +521,16 @@ export function PantallaVentas() {
         <ModalSalidaCaja turnoId={turno.id} onCerrar={() => setModalSalida(false)} onRegistrada={() => setModalSalida(false)} />
       )}
       {modalCobro && (
-        <ModalCobro total={total} onCerrar={() => setModalCobro(false)} onConfirmar={confirmarCobro} procesando={procesandoCobro} />
+        <ModalCobro
+          total={total}
+          clienteInicial={ticketActivo?.clienteId ? { id: ticketActivo.clienteId, nombre: ticketActivo.clienteNombre ?? "" } : null}
+          onCerrar={() => setModalCobro(false)}
+          onConfirmar={confirmarCobro}
+          procesando={procesandoCobro}
+        />
       )}
       {modalExistencias && <ModalExistenciasSucursales onCerrar={() => setModalExistencias(false)} />}
+      {modalCliente && <ModalSeleccionarCliente onCerrar={() => setModalCliente(false)} onSeleccionar={asignarCliente} />}
     </div>
   );
 }

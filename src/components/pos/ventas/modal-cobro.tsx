@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Boton } from "@/components/ui/boton";
 import { Campo } from "@/components/ui/campo";
@@ -26,11 +26,14 @@ const ICONOS: Record<FormaPago, React.ElementType> = {
 
 export function ModalCobro({
   total,
+  clienteInicial,
   onCerrar,
   onConfirmar,
   procesando,
 }: {
   total: number;
+  /** Cliente ya asignado a la cuenta desde la pantalla de Ventas (para precios); se precarga aquí para no tener que buscarlo de nuevo. */
+  clienteInicial?: { id: string; nombre: string } | null;
   onCerrar: () => void;
   onConfirmar: (pagos: { forma: FormaPago; monto: number; referencia?: string }[], clienteId: string | null) => void;
   procesando: boolean;
@@ -41,6 +44,17 @@ export function ModalCobro({
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [resultadosCliente, setResultadosCliente] = useState<PosClienteT[]>([]);
   const [buscandoCliente, setBuscandoCliente] = useState(false);
+
+  useEffect(() => {
+    if (!clienteInicial?.id) return;
+    fetch(`/api/pos/clientes/${clienteInicial.id}`)
+      .then((r) => r.json())
+      .then((json) => { if (json.ok) setCliente(json.data.cliente); });
+    // Solo se precarga una vez al abrir el modal con el cliente que ya
+    // traía la cuenta; si el cajero lo cambia aquí (para crédito), no debe
+    // volver a sobreescribirse.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const totalPagado = pagos.reduce((a, p) => a + p.monto, 0);
   const restante = Math.max(0, Math.round((total - totalPagado) * 100) / 100);
@@ -103,6 +117,12 @@ export function ModalCobro({
           <span className="text-sm font-medium text-marca">Total a pagar</span>
           <span className="text-2xl font-bold text-marca">{formatearMoneda(total)}</span>
         </div>
+
+        {cliente && !pagos.some((p) => p.forma === "CREDITO") && (
+          <p className="text-xs text-texto-suave">
+            Cliente de la cuenta: <span className="font-medium text-texto">{cliente.nombre}</span>
+          </p>
+        )}
 
         <div className="grid grid-cols-4 gap-2">
           {(Object.keys(ETIQUETAS_FORMA_PAGO) as FormaPago[]).map((forma) => {

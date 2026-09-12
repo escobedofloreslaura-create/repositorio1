@@ -125,7 +125,7 @@ async function main() {
     data: { nombre: "Don Chuy Abarrotes", telefono: "222 111 2233", direccion: "Calle 5 de Mayo 12", limiteCredito: 3000, sucursalId: sucursalCentro.id },
   });
   await prisma.posCliente.create({
-    data: { nombre: "Restaurante La Terraza", telefono: "222 333 4455", direccion: "Av. Reforma 200", limiteCredito: 5000, sucursalId: sucursalNorte.id },
+    data: { nombre: "Restaurante La Terraza", telefono: "222 333 4455", direccion: "Av. Reforma 200", limiteCredito: 5000, tipoPrecio: "CLIENTE_FRECUENTE", sucursalId: sucursalNorte.id },
   });
   console.log("✅ Clientes de crédito creados (uno por sucursal)");
 

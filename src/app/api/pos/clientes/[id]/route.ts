@@ -40,7 +40,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const body = await req.json();
-    const { nombre, direccion, telefono, limiteCredito, activo } = body;
+    const { nombre, direccion, telefono, limiteCredito, tipoPrecio, activo } = body;
 
     const cliente = await prisma.posCliente.update({
       where: { id },
@@ -49,6 +49,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         ...(direccion !== undefined ? { direccion: direccion || null } : {}),
         ...(telefono !== undefined ? { telefono: telefono || null } : {}),
         ...(limiteCredito !== undefined ? { limiteCredito: Number(limiteCredito) } : {}),
+        ...(tipoPrecio !== undefined ? { tipoPrecio } : {}),
         ...(activo !== undefined ? { activo } : {}),
       },
     });
