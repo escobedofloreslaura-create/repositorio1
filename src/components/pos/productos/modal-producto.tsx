@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Campo, Select } from "@/components/ui/campo";
 import { Boton } from "@/components/ui/boton";
@@ -39,6 +39,21 @@ export function ModalProducto({
   function set<K extends keyof typeof form>(campo: K, valor: (typeof form)[K]) {
     setForm((f) => ({ ...f, [campo]: valor }));
   }
+
+  // Si el modal se abre antes de que termine de cargar la lista de
+  // departamentos (p. ej. justo al entrar a la pantalla), "departamentoId"
+  // queda vacío y el <select> no tiene ninguna opción con ese valor: el
+  // navegador muestra el primer departamento como si estuviera elegido, pero
+  // el estado real sigue vacío y al guardar el servidor rechaza "nombre y
+  // departamento son requeridos" aunque se vea seleccionado. En cuanto llega
+  // la lista, si todavía no hay departamento elegido se completa con el
+  // primero para que lo que se ve y lo que se va a guardar sea lo mismo.
+  useEffect(() => {
+    if (!form.departamentoId && departamentos.length > 0) {
+      set("departamentoId", departamentos[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [departamentos]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

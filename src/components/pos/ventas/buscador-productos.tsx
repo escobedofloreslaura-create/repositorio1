@@ -52,14 +52,37 @@ export function BuscadorProductos({
     inputRef.current?.focus();
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  async function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== "Enter") return;
     e.preventDefault();
-    const codigoExacto = resultados.find((p) => p.codigoBarras === q.trim());
+    const codigo = q.trim();
+    if (!codigo) return;
+
+    const codigoExacto = resultados.find((p) => p.codigoBarras === codigo);
     if (codigoExacto) return seleccionar(codigoExacto);
     if (resultados.length === 1) return seleccionar(resultados[0]);
-    if (/^\d{6,}$/.test(q.trim()) && resultados.length === 0) {
-      onCodigoNoEncontrado(q.trim());
+
+    // Un lector de código de barras escribe el código completo y manda Enter
+    // en unos cuantos milisegundos, mucho más rápido que el debounce de la
+    // búsqueda (200ms) — en ese instante "resultados" puede seguir vacío o
+    // desactualizado. Antes de darlo por "no encontrado" se confirma con una
+    // búsqueda inmediata en vez de confiar en lo que dejó el último debounce,
+    // para no mandar a "producto no registrado" un código que sí existe.
+    setCargando(true);
+    try {
+      const res = await fetch(`/api/pos/productos?q=${encodeURIComponent(codigo)}`);
+      const json = await res.json();
+      const lista: PosProductoT[] = json.ok ? json.data : [];
+      setResultados(lista);
+      const encontrado = lista.find((p) => p.codigoBarras === codigo);
+      if (encontrado) return seleccionar(encontrado);
+      if (lista.length === 1) return seleccionar(lista[0]);
+    } finally {
+      setCargando(false);
+    }
+
+    if (/^\d{6,}$/.test(codigo)) {
+      onCodigoNoEncontrado(codigo);
       setQ("");
     }
   }
