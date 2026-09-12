@@ -42,7 +42,7 @@ export function ModalSeleccionarCliente({
     <Modal abierto onCerrar={onCerrar} titulo="Asignar cliente a la cuenta" tamano="lg">
       <div className="space-y-4">
         <p className="text-sm text-texto-suave">
-          Al asignar un cliente con precio de mayoreo o cliente frecuente, esos precios se aplican en automático a los productos de esta cuenta.
+          El cliente que asignes aquí aparecerá en el ticket de venta (en vez de &quot;Público en general&quot;). Si tiene mayoreo o cliente frecuente, recuerda seleccionar ese precio manualmente en cada producto del carrito.
         </p>
 
         <button

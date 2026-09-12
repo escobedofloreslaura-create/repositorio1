@@ -91,7 +91,7 @@ export function imprimirTicket(params: DatosTicket) {
   ${config.direccion ? `<p class="centro">${escaparHtml(config.direccion)}</p>` : ""}
   ${config.telefono ? `<p class="centro">Tel: ${escaparHtml(config.telefono)}</p>` : ""}
   <div class="linea"></div>
-  <p>Ticket: #${folio}<br/>Fecha: ${formatearFechaImpresion(fecha)}<br/>Cajero: ${escaparHtml(cajero)}${cliente ? `<br/>Cliente: ${escaparHtml(cliente)}` : ""}</p>
+  <p>Ticket: #${folio}<br/>Fecha: ${formatearFechaImpresion(fecha)}<br/>Cajero: ${escaparHtml(cajero)}<br/>Cliente: ${escaparHtml(cliente || "Público en general")}</p>
   <div class="linea"></div>
   <table>${filasItems}</table>
   <div class="linea"></div>
@@ -153,7 +153,7 @@ export function construirComandosTicket(params: DatosTicket): string[] {
   if (config.telefono) cmds.push(`Tel: ${config.telefono}\n`);
   cmds.push(escpos.izquierda, linea);
   cmds.push(`Ticket: #${folio}\n`, `Fecha: ${formatearFechaImpresion(fecha)}\n`, `Cajero: ${cajero}\n`);
-  if (cliente) cmds.push(`Cliente: ${cliente}\n`);
+  cmds.push(`Cliente: ${cliente || "Público en general"}\n`);
   cmds.push(linea);
 
   for (const item of items) {

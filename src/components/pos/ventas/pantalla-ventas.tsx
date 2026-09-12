@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, X, Trash2, Tags, Star, PackagePlus, Wallet, Receipt, Store, UserRound } from "lucide-react";
+import { Plus, X, Trash2, Tag, Tags, Star, PackagePlus, Wallet, Receipt, Store, UserRound } from "lucide-react";
 import { Boton } from "@/components/ui/boton";
 import { Badge } from "@/components/ui/badge";
 import { formatearMoneda } from "@/lib/formato";
@@ -30,23 +30,7 @@ interface ConfigTicket {
 const STORAGE_KEY = "pos_tickets_v1";
 
 function ticketNuevo(numero: number): Ticket {
-  return { id: crypto.randomUUID(), nombre: `Cuenta ${numero}`, items: [], clienteId: null, clienteNombre: null, clienteTipoPrecio: null };
-}
-
-// Calcula qué precio le corresponde a un producto según el tipo de precio del
-// cliente asignado a la cuenta (o el precio normal si es venta al público en
-// general, o si el cliente no tiene ese precio especial configurado).
-function precioSegunTipoCliente(
-  base: { precioNormal: number; precioMayoreo: number | null; precioClienteFrecuente: number | null },
-  tipoPrecio: Ticket["clienteTipoPrecio"]
-): { precioUnitario: number; esMayoreo: boolean; esClienteFrecuente: boolean } {
-  if (tipoPrecio === "MAYOREO" && base.precioMayoreo != null) {
-    return { precioUnitario: base.precioMayoreo, esMayoreo: true, esClienteFrecuente: false };
-  }
-  if (tipoPrecio === "CLIENTE_FRECUENTE" && base.precioClienteFrecuente != null) {
-    return { precioUnitario: base.precioClienteFrecuente, esMayoreo: false, esClienteFrecuente: true };
-  }
-  return { precioUnitario: base.precioNormal, esMayoreo: false, esClienteFrecuente: false };
+  return { id: crypto.randomUUID(), nombre: `Cuenta ${numero}`, items: [], clienteId: null, clienteNombre: null };
 }
 
 export function PantallaVentas() {
@@ -165,47 +149,33 @@ export function PantallaVentas() {
       return;
     }
     actualizarTicket(ticketActivo.id, (t) => {
-      const { precioUnitario, esMayoreo, esClienteFrecuente } = precioSegunTipoCliente(
-        { precioNormal: producto.precioVenta, precioMayoreo: producto.precioMayoreo, precioClienteFrecuente: producto.precioClienteFrecuente },
-        t.clienteTipoPrecio
-      );
       const item: ItemTicket = {
         claveLocal: crypto.randomUUID(),
         productoId: producto.id,
         nombre: producto.nombre,
         cantidad: 1,
-        precioUnitario,
+        precioUnitario: producto.precioVenta,
         precioNormal: producto.precioVenta,
         precioMayoreo: producto.precioMayoreo,
-        esMayoreo,
+        esMayoreo: false,
         precioClienteFrecuente: producto.precioClienteFrecuente,
-        esClienteFrecuente,
+        esClienteFrecuente: false,
         existenciaDisponible: producto.existencia,
       };
       return { ...t, items: [...t.items, item] };
     });
   }
 
-  // Asignar un cliente a la cuenta aplica en automático su precio (mayoreo o
-  // cliente frecuente) a todos los productos ya agregados y a los que se
-  // agreguen después; quitarlo (o "Público en general") regresa todo al
-  // precio normal para no dejar un descuento aplicado sin cliente de por medio.
+  // Asignar un cliente a la cuenta es solo para que quede registrado a quién
+  // se le vendió (su nombre en el ticket en vez de "Público en general"); el
+  // precio de cada línea lo elige el cajero a mano con los botones de Venta
+  // / Mayoreo / Cliente frecuente, no cambia solo al asignar el cliente.
   function asignarCliente(cliente: PosClienteT | null) {
     if (!ticketActivo) return;
-    const tipoPrecio = cliente?.tipoPrecio ?? null;
     actualizarTicket(ticketActivo.id, (t) => ({
       ...t,
       clienteId: cliente?.id ?? null,
       clienteNombre: cliente?.nombre ?? null,
-      clienteTipoPrecio: tipoPrecio,
-      items: t.items.map((i) => {
-        if (i.productoId === null) return i;
-        const { precioUnitario, esMayoreo, esClienteFrecuente } = precioSegunTipoCliente(
-          { precioNormal: i.precioNormal, precioMayoreo: i.precioMayoreo, precioClienteFrecuente: i.precioClienteFrecuente },
-          tipoPrecio
-        );
-        return { ...i, precioUnitario, esMayoreo, esClienteFrecuente };
-      }),
     }));
     setModalCliente(false);
     toast.success(cliente ? `Cliente asignado: ${cliente.nombre}` : "Cuenta marcada como público en general");
@@ -241,9 +211,9 @@ export function PantallaVentas() {
     }));
   }
 
-  // Mayoreo y cliente frecuente son excluyentes entre sí: activar uno
-  // desactiva el otro y vuelve a calcular el precio unitario de la línea.
-  function alternarPrecioEspecial(clave: string, tipo: "MAYOREO" | "CLIENTE_FRECUENTE") {
+  // El cajero elige explícitamente entre las 3 tarifas de la línea (Venta,
+  // Mayoreo, Cliente frecuente); solo una puede estar activa a la vez.
+  function seleccionarPrecio(clave: string, tipo: "VENTA" | "MAYOREO" | "CLIENTE_FRECUENTE") {
     if (!ticketActivo) return;
     actualizarTicket(ticketActivo.id, (t) => ({
       ...t,
@@ -251,14 +221,13 @@ export function PantallaVentas() {
         if (i.claveLocal !== clave) return i;
         // "!= null" (no estricto) también cubre carritos guardados en el
         // navegador antes de que este campo existiera (queda undefined).
-        if (tipo === "MAYOREO") {
-          if (i.precioMayoreo == null) return i;
-          const esMayoreo = !i.esMayoreo;
-          return { ...i, esMayoreo, esClienteFrecuente: false, precioUnitario: esMayoreo ? i.precioMayoreo! : i.precioNormal };
+        if (tipo === "MAYOREO" && i.precioMayoreo != null) {
+          return { ...i, esMayoreo: true, esClienteFrecuente: false, precioUnitario: i.precioMayoreo };
         }
-        if (i.precioClienteFrecuente == null) return i;
-        const esClienteFrecuente = !i.esClienteFrecuente;
-        return { ...i, esClienteFrecuente, esMayoreo: false, precioUnitario: esClienteFrecuente ? i.precioClienteFrecuente! : i.precioNormal };
+        if (tipo === "CLIENTE_FRECUENTE" && i.precioClienteFrecuente != null) {
+          return { ...i, esMayoreo: false, esClienteFrecuente: true, precioUnitario: i.precioClienteFrecuente };
+        }
+        return { ...i, esMayoreo: false, esClienteFrecuente: false, precioUnitario: i.precioNormal };
       }),
     }));
   }
@@ -327,7 +296,7 @@ export function PantallaVentas() {
         });
       }
       if (tickets.length === 1) {
-        actualizarTicket(ticketActivo.id, (t) => ({ ...t, items: [], clienteId: null, clienteNombre: null, clienteTipoPrecio: null }));
+        actualizarTicket(ticketActivo.id, (t) => ({ ...t, items: [], clienteId: null, clienteNombre: null }));
       } else {
         quitarCuentaSinConfirmar(ticketActivo.id);
       }
@@ -465,9 +434,20 @@ export function PantallaVentas() {
                       +
                     </button>
                   </div>
+                  {(item.precioMayoreo != null || item.precioClienteFrecuente != null) && (
+                    <button
+                      onClick={() => seleccionarPrecio(item.claveLocal, "VENTA")}
+                      className={cn(
+                        "flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg border",
+                        !item.esMayoreo && !item.esClienteFrecuente ? "bg-marca text-white border-marca" : "border-borde text-texto-suave hover:bg-surface-hover"
+                      )}
+                    >
+                      <Tag className="h-3 w-3" /> Venta
+                    </button>
+                  )}
                   {item.precioMayoreo != null && (
                     <button
-                      onClick={() => alternarPrecioEspecial(item.claveLocal, "MAYOREO")}
+                      onClick={() => seleccionarPrecio(item.claveLocal, "MAYOREO")}
                       className={cn(
                         "flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg border",
                         item.esMayoreo ? "bg-marca text-white border-marca" : "border-borde text-texto-suave hover:bg-surface-hover"
@@ -478,7 +458,7 @@ export function PantallaVentas() {
                   )}
                   {item.precioClienteFrecuente != null && (
                     <button
-                      onClick={() => alternarPrecioEspecial(item.claveLocal, "CLIENTE_FRECUENTE")}
+                      onClick={() => seleccionarPrecio(item.claveLocal, "CLIENTE_FRECUENTE")}
                       className={cn(
                         "flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg border",
                         item.esClienteFrecuente ? "bg-marca text-white border-marca" : "border-borde text-texto-suave hover:bg-surface-hover"

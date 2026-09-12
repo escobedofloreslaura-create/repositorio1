@@ -84,8 +84,7 @@ export interface Ticket {
   id: string;
   nombre: string;
   items: ItemTicket[];
+  /** Cliente asignado a la cuenta: solo para atribución en el ticket (su nombre en vez de "Público en general"). No cambia el precio de las líneas; eso lo elige el cajero a mano. */
   clienteId: string | null;
   clienteNombre: string | null;
-  /** Tipo de precio del cliente asignado a esta cuenta; null cuando es venta al público en general. */
-  clienteTipoPrecio: TipoPrecioCliente | null;
 }
