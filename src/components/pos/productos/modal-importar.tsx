@@ -59,7 +59,10 @@ export function ModalImportar({ onCerrar, onImportado }: { onCerrar: () => void;
       <div className="space-y-4">
         <p className="text-sm text-texto-suave">
           Sube un archivo <strong>.xlsx</strong> o <strong>.csv</strong> con columnas: nombre, código de barras, departamento, unidad,
-          precio costo, precio venta, precio mayoreo, existencia, existencia mínima.
+          precio costo, precio venta, precio mayoreo, precio cliente frecuente, existencia, existencia mínima. Solo el nombre es obligatorio: si el producto
+          ya existe (se busca por código de barras o nombre), las columnas que dejes vacías no se modifican — por ejemplo, puedes
+          subir solo nombre + existencia para actualizar el conteo de inventario sin tocar los precios. Los productos nuevos sí
+          necesitan precio costo y precio venta.
         </p>
 
         <div

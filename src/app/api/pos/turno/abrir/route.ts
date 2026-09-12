@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requerirSesionPos } from "@/lib/pos/auth";
+import { requerirSesionPos, requerirSucursalActiva } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 
 // Registro del fondo inicial diario de caja para dar cambio.
 export async function POST(req: NextRequest) {
   try {
     const sesion = await requerirSesionPos();
+    const sucursalId = await requerirSucursalActiva(sesion);
     const { fondoInicial } = await req.json();
 
     const abierto = await prisma.posTurno.findFirst({ where: { usuarioId: sesion.id, estado: "ABIERTO" } });
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
 
     const turno = await prisma.$transaction(async (tx) => {
       const nuevo = await tx.posTurno.create({
-        data: { usuarioId: sesion.id, fondoInicial: monto },
+        data: { usuarioId: sesion.id, sucursalId, fondoInicial: monto },
       });
       await tx.posMovimientoCaja.create({
         data: {

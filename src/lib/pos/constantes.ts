@@ -52,6 +52,15 @@ export const TIPO_COBRO_CLIENTE_POR_FORMA: Record<FormaAbono, (typeof TIPOS_MOVI
   TRANSFERENCIA: "COBRO_CLIENTE_TRANSFERENCIA",
 };
 
+export const TIPOS_PRECIO_CLIENTE = ["VENTA", "MAYOREO", "CLIENTE_FRECUENTE"] as const;
+export type TipoPrecioCliente = (typeof TIPOS_PRECIO_CLIENTE)[number];
+
+export const ETIQUETAS_TIPO_PRECIO_CLIENTE: Record<TipoPrecioCliente, string> = {
+  VENTA: "Precio de venta (menudeo)",
+  MAYOREO: "Mayoreo",
+  CLIENTE_FRECUENTE: "Cliente frecuente",
+};
+
 export const TIPOS_MOVIMIENTO_INVENTARIO = [
   "ENTRADA",
   "SALIDA",
@@ -59,4 +68,8 @@ export const TIPOS_MOVIMIENTO_INVENTARIO = [
   "VENTA",
   "CANCELACION",
   "DEVOLUCION",
+  "TRASPASO_ENTRADA",
+  "TRASPASO_SALIDA",
 ] as const;
+
+export const LIMITE_ADMIN_GENERAL = 2;

@@ -16,6 +16,12 @@ export function formatearFecha(fecha: Date | string): string {
   return format(new Date(fecha), "d 'de' MMMM 'de' yyyy", { locale: es });
 }
 
+// Para documentos impresos (tickets, cortes): siempre la fecha completa, sin
+// el "Hoy"/"Ayer" relativo que sí conviene en las listas de la pantalla.
+export function formatearFechaImpresion(fecha: Date | string): string {
+  return format(new Date(fecha), "dd/MM/yyyy h:mm a");
+}
+
 export function formatearFechaCorta(fecha: Date | string): string {
   return format(new Date(fecha), "dd/MM/yyyy");
 }

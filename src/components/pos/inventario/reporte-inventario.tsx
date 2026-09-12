@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Download, Printer } from "lucide-react";
+import { Download, Printer, Upload } from "lucide-react";
 import { Boton } from "@/components/ui/boton";
 import { Badge } from "@/components/ui/badge";
 import { SkeletonLista } from "@/components/ui/skeleton";
 import { formatearMoneda } from "@/lib/formato";
+import { ModalImportar } from "@/components/pos/productos/modal-importar";
 
 interface Fila {
   id: string;
@@ -16,16 +17,20 @@ interface Fila {
   bajaExistencia: boolean;
   precioCosto: number;
   precioVenta: number;
+  precioMayoreo: number | null;
+  precioClienteFrecuente: number | null;
   valorCosto: number;
   valorVenta: number;
 }
 
-export function ReporteInventario() {
+export function ReporteInventario({ puedeImportar }: { puedeImportar: boolean }) {
   const [filas, setFilas] = useState<Fila[]>([]);
   const [totales, setTotales] = useState({ valorCosto: 0, valorVenta: 0, piezas: 0 });
   const [cargando, setCargando] = useState(true);
+  const [modalImportar, setModalImportar] = useState(false);
 
-  useEffect(() => {
+  function cargar() {
+    setCargando(true);
     fetch("/api/pos/reportes/inventario")
       .then((r) => r.json())
       .then((json) => {
@@ -35,7 +40,9 @@ export function ReporteInventario() {
         }
       })
       .finally(() => setCargando(false));
-  }, []);
+  }
+
+  useEffect(cargar, []);
 
   async function exportarExcel() {
     const XLSX = await import("xlsx");
@@ -48,6 +55,8 @@ export function ReporteInventario() {
         "Existencia mínima": f.existenciaMinima,
         "Precio costo": f.precioCosto,
         "Precio venta": f.precioVenta,
+        "Precio mayoreo": f.precioMayoreo ?? "",
+        "Precio cliente frecuente": f.precioClienteFrecuente ?? "",
         "Valor a costo": f.valorCosto,
         "Valor a venta": f.valorVenta,
       }))
@@ -77,10 +86,17 @@ export function ReporteInventario() {
           </div>
         </div>
         <div className="flex gap-2 no-print">
+          {puedeImportar && (
+            <Boton variante="secundario" icono={<Upload className="h-4 w-4" />} onClick={() => setModalImportar(true)}>Importar</Boton>
+          )}
           <Boton variante="secundario" icono={<Download className="h-4 w-4" />} onClick={exportarExcel}>Excel</Boton>
           <Boton variante="secundario" icono={<Printer className="h-4 w-4" />} onClick={() => window.print()}>Imprimir</Boton>
         </div>
       </div>
+
+      {modalImportar && (
+        <ModalImportar onCerrar={() => setModalImportar(false)} onImportado={cargar} />
+      )}
 
       <div className="overflow-x-auto rounded-2xl border border-borde bg-surface">
         <table className="w-full text-sm">
@@ -89,6 +105,8 @@ export function ReporteInventario() {
               <th className="p-3 font-medium">Producto</th>
               <th className="p-3 font-medium">Departamento</th>
               <th className="p-3 font-medium text-right">Existencia</th>
+              <th className="p-3 font-medium text-right">Mayoreo</th>
+              <th className="p-3 font-medium text-right">Cliente frecuente</th>
               <th className="p-3 font-medium text-right">Valor costo</th>
               <th className="p-3 font-medium text-right">Valor venta</th>
             </tr>
@@ -101,6 +119,8 @@ export function ReporteInventario() {
                 <td className="p-3 text-right">
                   {f.bajaExistencia ? <Badge variante="peligro">{f.existencia}</Badge> : f.existencia}
                 </td>
+                <td className="p-3 text-right text-texto-suave">{f.precioMayoreo ? formatearMoneda(f.precioMayoreo) : "—"}</td>
+                <td className="p-3 text-right text-texto-suave">{f.precioClienteFrecuente ? formatearMoneda(f.precioClienteFrecuente) : "—"}</td>
                 <td className="p-3 text-right">{formatearMoneda(f.valorCosto)}</td>
                 <td className="p-3 text-right font-medium">{formatearMoneda(f.valorVenta)}</td>
               </tr>

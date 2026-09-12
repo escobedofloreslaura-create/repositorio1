@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Boton } from "@/components/ui/boton";
 import { Campo } from "@/components/ui/campo";
@@ -12,7 +12,10 @@ interface PagoBorrador {
   claveLocal: string;
   forma: FormaPago;
   monto: number;
+  referencia: string;
 }
+
+const FORMAS_CON_REFERENCIA: FormaPago[] = ["TARJETA", "TRANSFERENCIA"];
 
 const ICONOS: Record<FormaPago, React.ElementType> = {
   EFECTIVO: Banknote,
@@ -23,13 +26,16 @@ const ICONOS: Record<FormaPago, React.ElementType> = {
 
 export function ModalCobro({
   total,
+  clienteInicial,
   onCerrar,
   onConfirmar,
   procesando,
 }: {
   total: number;
+  /** Cliente ya asignado a la cuenta desde la pantalla de Ventas (para precios); se precarga aquí para no tener que buscarlo de nuevo. */
+  clienteInicial?: { id: string; nombre: string } | null;
   onCerrar: () => void;
-  onConfirmar: (pagos: { forma: FormaPago; monto: number }[], clienteId: string | null) => void;
+  onConfirmar: (pagos: { forma: FormaPago; monto: number; referencia?: string }[], clienteId: string | null) => void;
   procesando: boolean;
 }) {
   const [pagos, setPagos] = useState<PagoBorrador[]>([]);
@@ -38,6 +44,17 @@ export function ModalCobro({
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [resultadosCliente, setResultadosCliente] = useState<PosClienteT[]>([]);
   const [buscandoCliente, setBuscandoCliente] = useState(false);
+
+  useEffect(() => {
+    if (!clienteInicial?.id) return;
+    fetch(`/api/pos/clientes/${clienteInicial.id}`)
+      .then((r) => r.json())
+      .then((json) => { if (json.ok) setCliente(json.data.cliente); });
+    // Solo se precarga una vez al abrir el modal con el cliente que ya
+    // traía la cuenta; si el cajero lo cambia aquí (para crédito), no debe
+    // volver a sobreescribirse.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const totalPagado = pagos.reduce((a, p) => a + p.monto, 0);
   const restante = Math.max(0, Math.round((total - totalPagado) * 100) / 100);
@@ -54,11 +71,15 @@ export function ModalCobro({
 
   function agregarForma(forma: FormaPago) {
     if (pagos.some((p) => p.forma === forma)) return;
-    setPagos((prev) => [...prev, { claveLocal: crypto.randomUUID(), forma, monto: restante }]);
+    setPagos((prev) => [...prev, { claveLocal: crypto.randomUUID(), forma, monto: restante, referencia: "" }]);
   }
 
   function actualizarMonto(clave: string, monto: number) {
     setPagos((prev) => prev.map((p) => (p.claveLocal === clave ? { ...p, monto } : p)));
+  }
+
+  function actualizarReferencia(clave: string, referencia: string) {
+    setPagos((prev) => prev.map((p) => (p.claveLocal === clave ? { ...p, referencia } : p)));
   }
 
   function quitarPago(clave: string) {
@@ -84,7 +105,7 @@ export function ModalCobro({
   function confirmar() {
     if (!listo) return;
     onConfirmar(
-      pagos.map((p) => ({ forma: p.forma, monto: p.monto })),
+      pagos.map((p) => ({ forma: p.forma, monto: p.monto, referencia: p.referencia.trim() || undefined })),
       cliente?.id ?? null
     );
   }
@@ -96,6 +117,12 @@ export function ModalCobro({
           <span className="text-sm font-medium text-marca">Total a pagar</span>
           <span className="text-2xl font-bold text-marca">{formatearMoneda(total)}</span>
         </div>
+
+        {cliente && !pagos.some((p) => p.forma === "CREDITO") && (
+          <p className="text-xs text-texto-suave">
+            Cliente de la cuenta: <span className="font-medium text-texto">{cliente.nombre}</span>
+          </p>
+        )}
 
         <div className="grid grid-cols-4 gap-2">
           {(Object.keys(ETIQUETAS_FORMA_PAGO) as FormaPago[]).map((forma) => {
@@ -121,20 +148,32 @@ export function ModalCobro({
             {pagos.map((pago) => {
               const Icono = ICONOS[pago.forma];
               return (
-                <div key={pago.claveLocal} className="flex items-center gap-2 rounded-xl border border-borde p-3">
-                  <Icono className="h-4 w-4 text-marca flex-shrink-0" />
-                  <span className="text-sm font-medium w-28 flex-shrink-0">{ETIQUETAS_FORMA_PAGO[pago.forma]}</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={pago.monto}
-                    onChange={(e) => actualizarMonto(pago.claveLocal, Number(e.target.value))}
-                    className="flex-1 rounded-lg border border-borde px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-marca/30"
-                  />
-                  <button type="button" onClick={() => quitarPago(pago.claveLocal)} className="text-texto-suave hover:text-peligro p-1" aria-label="Quitar">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                <div key={pago.claveLocal} className="rounded-xl border border-borde p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Icono className="h-4 w-4 text-marca flex-shrink-0" />
+                    <span className="text-sm font-medium w-28 flex-shrink-0">{ETIQUETAS_FORMA_PAGO[pago.forma]}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={pago.monto}
+                      onChange={(e) => actualizarMonto(pago.claveLocal, Number(e.target.value))}
+                      className="flex-1 rounded-lg border border-borde px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-marca/30"
+                    />
+                    <button type="button" onClick={() => quitarPago(pago.claveLocal)} className="text-texto-suave hover:text-peligro p-1" aria-label="Quitar">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {FORMAS_CON_REFERENCIA.includes(pago.forma) && (
+                    <div className="flex gap-2 pl-6">
+                      <input
+                        value={pago.referencia}
+                        onChange={(e) => actualizarReferencia(pago.claveLocal, e.target.value)}
+                        placeholder="Folio / autorización de la terminal (opcional)"
+                        className="flex-1 rounded-lg border border-borde px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-marca/30"
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}

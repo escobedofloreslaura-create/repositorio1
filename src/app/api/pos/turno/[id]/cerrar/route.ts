@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requerirSesionPos } from "@/lib/pos/auth";
+import { requerirSesionPos, puedeOperarTurno } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 
 function sumaPorTipo(movimientos: { tipo: string; monto: number }[], tipo: string): number {
   return movimientos.filter((m) => m.tipo === tipo).reduce((acc, m) => acc + m.monto, 0);
+}
+
+const TIPOS_MOVIMIENTO_CON_CONCEPTO = ["SALIDA", "PAGO_PROVEEDOR", "ENTRADA_MANUAL"];
+
+function detalleMovimientos(movimientos: { tipo: string; monto: number; concepto: string | null }[]) {
+  return movimientos
+    .filter((m) => TIPOS_MOVIMIENTO_CON_CONCEPTO.includes(m.tipo))
+    .map((m) => ({ tipo: m.tipo, concepto: m.concepto ?? "", monto: m.monto }));
 }
 
 // Corte de caja del día: resume entradas/salidas, ventas totales y la
@@ -18,22 +26,30 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       const turno = await tx.posTurno.findUnique({ where: { id }, include: { movimientos: true } });
       if (!turno) throw new Error("NO_ENCONTRADA");
       if (turno.estado !== "ABIERTO") throw new Error("YA_CERRADO");
-      if (turno.usuarioId !== sesion.id && sesion.rol !== "ADMINISTRADOR") throw new Error("SIN_PERMISO");
+      if (!puedeOperarTurno(sesion, turno)) throw new Error("SIN_PERMISO");
 
       const ventas = await tx.posVenta.findMany({
         where: { turnoId: id, estado: "COMPLETADA" },
-        include: { detalles: true },
+        include: { detalles: { include: { producto: { include: { departamento: true } } } } },
       });
 
       let ventasTotales = 0;
       let costoVentas = 0;
+      const ventasPorDepartamentoMapa = new Map<string, number>();
       for (const venta of ventas) {
         for (const detalle of venta.detalles) {
           const cantidadNeta = detalle.cantidad - detalle.cantidadDevuelta;
-          ventasTotales += cantidadNeta * detalle.precioUnitario;
+          const subtotalNeto = cantidadNeta * detalle.precioUnitario;
+          ventasTotales += subtotalNeto;
           costoVentas += cantidadNeta * detalle.costoUnitario;
+
+          const nombreDepartamento = detalle.producto?.departamento.nombre ?? "Otros";
+          ventasPorDepartamentoMapa.set(nombreDepartamento, (ventasPorDepartamentoMapa.get(nombreDepartamento) ?? 0) + subtotalNeto);
         }
       }
+      const ventasPorDepartamento = Array.from(ventasPorDepartamentoMapa, ([departamento, total]) => ({ departamento, total })).sort(
+        (a, b) => b.total - a.total
+      );
 
       const movimientos = turno.movimientos;
       const totalEfectivo = sumaPorTipo(movimientos, "VENTA_EFECTIVO");
@@ -61,6 +77,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       const nuevoCorte = await tx.posCorteCaja.create({
         data: {
           turnoId: id,
+          sucursalId: turno.sucursalId,
           fondoInicial: turno.fondoInicial,
           totalEfectivo,
           totalTarjeta,
@@ -73,14 +90,29 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           costoVentas,
           gananciaReal: ventasTotales - costoVentas,
           efectivoEsperado,
+          // Se atribuye a quien tiene la sesión abierta al cerrar la caja
+          // (no al dueño del turno): el nombre en el corte y si se ve o no
+          // la ganancia van ligados a la sesión que realmente ejecuta el
+          // cierre. "Reasignar caja" solo le da al cajero permiso para
+          // cerrar un turno que no abrió él; para que el corte quede a su
+          // nombre, debe iniciar sesión con su propio usuario y cerrarla él.
           usuarioId: sesion.id,
         },
+        include: { usuario: { select: { nombre: true } } },
       });
 
       await tx.posTurno.update({ where: { id }, data: { estado: "CERRADO", cerradoEn: new Date() } });
 
-      return nuevoCorte;
+      return { ...nuevoCorte, ventasPorDepartamento, movimientosDetalle: detalleMovimientos(movimientos) };
     });
+
+    // La ganancia (costo vs. venta) y el desglose por departamento son
+    // información confidencial del negocio: solo los administradores la ven.
+    // Un cajero solo ve el importe total de venta.
+    if (sesion.rol !== "ADMINISTRADOR") {
+      const { costoVentas: _costoVentas, gananciaReal: _gananciaReal, ventasPorDepartamento: _ventasPorDepartamento, ...resto } = corte;
+      return NextResponse.json({ ok: true, data: resto });
+    }
 
     return NextResponse.json({ ok: true, data: corte });
   } catch (e) {

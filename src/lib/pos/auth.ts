@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { cache } from "react";
 
 export const POS_COOKIE = "pos_session";
+export const POS_SUCURSAL_COOKIE = "pos_sucursal_activa";
 export const LIMITE_ADMINISTRADORES = 2;
 export const LIMITE_CAJEROS = 5;
 
@@ -12,6 +13,8 @@ export interface SesionPos {
   nombre: string;
   usuario: string;
   rol: "ADMINISTRADOR" | "CAJERO";
+  /** Sucursal fija del usuario. Nulo = Administrador General (sin tienda fija). */
+  sucursalId: string | null;
 }
 
 export const obtenerSesionPos = cache(async (): Promise<SesionPos | null> => {
@@ -34,6 +37,7 @@ export const obtenerSesionPos = cache(async (): Promise<SesionPos | null> => {
     nombre: u.nombre,
     usuario: u.usuario,
     rol: u.rol as "ADMINISTRADOR" | "CAJERO",
+    sucursalId: u.sucursalId,
   };
 });
 
@@ -47,6 +51,55 @@ export async function requerirAdminPos(): Promise<SesionPos> {
   const sesion = await requerirSesionPos();
   if (sesion.rol !== "ADMINISTRADOR") throw new Error("SOLO_ADMIN");
   return sesion;
+}
+
+/** Administrador General: sin sucursal fija, gestiona catálogo/precios/traspasos y puede operar cualquier tienda. */
+export function esAdminGeneral(sesion: SesionPos): boolean {
+  return sesion.rol === "ADMINISTRADOR" && sesion.sucursalId === null;
+}
+
+export async function requerirAdminGeneral(): Promise<SesionPos> {
+  const sesion = await requerirAdminPos();
+  if (sesion.sucursalId !== null) throw new Error("SOLO_ADMIN_GENERAL");
+  return sesion;
+}
+
+/**
+ * Puede este usuario operar (vender, hacer movimientos de caja, cerrar) el
+ * turno indicado: el propio cajero, el Administrador General, o un
+ * administrador de la MISMA sucursal que el turno. Un administrador de otra
+ * tienda no cuenta, aunque tenga el rol ADMINISTRADOR.
+ */
+export function puedeOperarTurno(sesion: SesionPos, turno: { usuarioId: string; sucursalId: string }): boolean {
+  if (turno.usuarioId === sesion.id) return true;
+  if (esAdminGeneral(sesion)) return true;
+  return sesion.rol === "ADMINISTRADOR" && sesion.sucursalId === turno.sucursalId;
+}
+
+/**
+ * Sucursal en la que el usuario está operando en este momento. Para usuarios
+ * de tienda es siempre la suya. Para el Administrador General es la que haya
+ * elegido con el selector (cookie), o la primera sucursal activa si no ha
+ * elegido ninguna todavía.
+ */
+export async function obtenerSucursalActiva(sesion: SesionPos): Promise<string | null> {
+  if (sesion.sucursalId) return sesion.sucursalId;
+
+  const cookieStore = await cookies();
+  const elegida = cookieStore.get(POS_SUCURSAL_COOKIE)?.value;
+  if (elegida) {
+    const existe = await prisma.posSucursal.findUnique({ where: { id: elegida } });
+    if (existe && existe.activa) return existe.id;
+  }
+
+  const primera = await prisma.posSucursal.findFirst({ where: { activa: true }, orderBy: { creadoEn: "asc" } });
+  return primera?.id ?? null;
+}
+
+export async function requerirSucursalActiva(sesion: SesionPos): Promise<string> {
+  const sucursalId = await obtenerSucursalActiva(sesion);
+  if (!sucursalId) throw new Error("SIN_SUCURSAL");
+  return sucursalId;
 }
 
 export async function crearSesionPos(usuarioId: string): Promise<string> {

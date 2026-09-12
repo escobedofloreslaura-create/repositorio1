@@ -27,7 +27,7 @@ interface VentaDetalle {
   estado: string;
   notas: string | null;
   detalles: DetalleVenta[];
-  pagos: { forma: FormaPago; monto: number }[];
+  pagos: { forma: FormaPago; monto: number; referencia: string | null }[];
   devoluciones: { id: string }[];
   cliente: { nombre: string } | null;
   usuario: { nombre: string };
@@ -156,7 +156,10 @@ export function ModalDetalleVenta({ ventaId, onCerrar, onCambio }: { ventaId: st
 
           <div className="flex flex-wrap gap-2">
             {venta.pagos.map((p, i) => (
-              <Badge key={i} variante="neutro">{ETIQUETAS_FORMA_PAGO[p.forma]}: {formatearMoneda(p.monto)}</Badge>
+              <Badge key={i} variante="neutro">
+                {ETIQUETAS_FORMA_PAGO[p.forma]}: {formatearMoneda(p.monto)}
+                {p.referencia ? ` · Folio ${p.referencia}` : ""}
+              </Badge>
             ))}
           </div>
 

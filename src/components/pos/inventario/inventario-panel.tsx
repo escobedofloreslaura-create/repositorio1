@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { ReporteInventario } from "./reporte-inventario";
 import { KardexPanel } from "./kardex-panel";
 
-export function InventarioPanel() {
+export function InventarioPanel({ puedeImportar }: { puedeImportar: boolean }) {
   const [tab, setTab] = useState<"reporte" | "kardex">("reporte");
 
   return (
@@ -26,7 +26,7 @@ export function InventarioPanel() {
         ))}
       </div>
 
-      {tab === "reporte" ? <ReporteInventario /> : <KardexPanel />}
+      {tab === "reporte" ? <ReporteInventario puedeImportar={puedeImportar} /> : <KardexPanel />}
     </div>
   );
 }

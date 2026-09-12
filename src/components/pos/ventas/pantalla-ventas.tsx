@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, X, Trash2, Tags, PackagePlus, Wallet, Receipt } from "lucide-react";
+import { Plus, X, Trash2, Tag, Tags, Star, PackagePlus, Wallet, Receipt, Store, UserRound } from "lucide-react";
 import { Boton } from "@/components/ui/boton";
 import { Badge } from "@/components/ui/badge";
 import { formatearMoneda } from "@/lib/formato";
@@ -11,8 +11,10 @@ import { ModalAperturaCaja } from "./modal-apertura-caja";
 import { ModalSalidaCaja } from "./modal-salida-caja";
 import { ModalProductoComun } from "./modal-producto-comun";
 import { ModalCobro } from "./modal-cobro";
+import { ModalExistenciasSucursales } from "./modal-existencias-sucursales";
+import { ModalSeleccionarCliente } from "./modal-seleccionar-cliente";
 import { imprimirTicketAutomatico } from "@/lib/pos/imprimir-ticket";
-import type { PosProductoT, PosDepartamentoT, ItemTicket, Ticket } from "@/lib/pos/tipos";
+import type { PosProductoT, PosClienteT, ItemTicket, Ticket } from "@/lib/pos/tipos";
 import type { FormaPago } from "@/lib/pos/constantes";
 
 interface ConfigTicket {
@@ -20,6 +22,7 @@ interface ConfigTicket {
   direccion: string | null;
   telefono: string | null;
   mensajeTicket: string;
+  logoUrl: string | null;
   simboloMoneda: string;
   impresora: string | null;
 }
@@ -32,22 +35,27 @@ function ticketNuevo(numero: number): Ticket {
 
 export function PantallaVentas() {
   const [turno, setTurno] = useState<{ id: string; fondoInicial: number } | null | undefined>(undefined);
-  const [departamentos, setDepartamentos] = useState<PosDepartamentoT[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ticketActivoId, setTicketActivoId] = useState<string>("");
   const [modalProductoComun, setModalProductoComun] = useState(false);
   const [modalSalida, setModalSalida] = useState(false);
+  const [modalExistencias, setModalExistencias] = useState(false);
+  const [modalCliente, setModalCliente] = useState(false);
   const [modalCobro, setModalCobro] = useState(false);
   const [procesandoCobro, setProcesandoCobro] = useState(false);
   const [versionCatalogo, setVersionCatalogo] = useState(0);
   const [config, setConfig] = useState<ConfigTicket | null>(null);
   const [sesionNombre, setSesionNombre] = useState("");
+  const [avisoStock, setAvisoStock] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!avisoStock) return;
+    const t = setTimeout(() => setAvisoStock(null), 5000);
+    return () => clearTimeout(t);
+  }, [avisoStock]);
 
   useEffect(() => {
     cargarTurno();
-    fetch("/api/pos/departamentos")
-      .then((r) => r.json())
-      .then((json) => { if (json.ok) setDepartamentos(json.data); });
     fetch("/api/pos/config")
       .then((r) => r.json())
       .then((json) => { if (json.ok) setConfig(json.data); });
@@ -114,16 +122,33 @@ export function PantallaVentas() {
     }
   }
 
+  // Si el producto tiene existencia registrada (existenciaDisponible no es
+  // null) y la cantidad pedida la rebasa, avisa y la limita a lo disponible
+  // en vez de dejar capturar de más sin que el cajero se entere. El aviso se
+  // muestra como un letrero grande al centro del carrito (no un toast chico)
+  // para que sea imposible pasarlo por alto.
+  function limitarACantidadDisponible(item: ItemTicket, cantidadDeseada: number): number {
+    if (item.existenciaDisponible !== null && cantidadDeseada > item.existenciaDisponible) {
+      setAvisoStock(
+        `Inventario insuficiente: solo hay ${item.existenciaDisponible} ${item.existenciaDisponible === 1 ? "pieza disponible" : "piezas disponibles"} de "${item.nombre}" en esta sucursal.`
+      );
+      return item.existenciaDisponible;
+    }
+    return cantidadDeseada;
+  }
+
   function agregarProducto(producto: PosProductoT) {
     if (!ticketActivo) return;
+    const existente = ticketActivo.items.find((i) => i.productoId === producto.id && !i.esMayoreo && !i.esClienteFrecuente);
+    if (existente) {
+      const nuevaCantidad = limitarACantidadDisponible(existente, existente.cantidad + 1);
+      actualizarTicket(ticketActivo.id, (t) => ({
+        ...t,
+        items: t.items.map((i) => (i.claveLocal === existente.claveLocal ? { ...i, cantidad: nuevaCantidad } : i)),
+      }));
+      return;
+    }
     actualizarTicket(ticketActivo.id, (t) => {
-      const existente = t.items.find((i) => i.productoId === producto.id && !i.esMayoreo);
-      if (existente) {
-        return {
-          ...t,
-          items: t.items.map((i) => (i === existente ? { ...i, cantidad: i.cantidad + 1 } : i)),
-        };
-      }
       const item: ItemTicket = {
         claveLocal: crypto.randomUUID(),
         productoId: producto.id,
@@ -133,10 +158,27 @@ export function PantallaVentas() {
         precioNormal: producto.precioVenta,
         precioMayoreo: producto.precioMayoreo,
         esMayoreo: false,
+        precioClienteFrecuente: producto.precioClienteFrecuente,
+        esClienteFrecuente: false,
         existenciaDisponible: producto.existencia,
       };
       return { ...t, items: [...t.items, item] };
     });
+  }
+
+  // Asignar un cliente a la cuenta es solo para que quede registrado a quién
+  // se le vendió (su nombre en el ticket en vez de "Público en general"); el
+  // precio de cada línea lo elige el cajero a mano con los botones de Venta
+  // / Mayoreo / Cliente frecuente, no cambia solo al asignar el cliente.
+  function asignarCliente(cliente: PosClienteT | null) {
+    if (!ticketActivo) return;
+    actualizarTicket(ticketActivo.id, (t) => ({
+      ...t,
+      clienteId: cliente?.id ?? null,
+      clienteNombre: cliente?.nombre ?? null,
+    }));
+    setModalCliente(false);
+    toast.success(cliente ? `Cliente asignado: ${cliente.nombre}` : "Cuenta marcada como público en general");
   }
 
   function agregarProductoComun(descripcion: string, monto: number) {
@@ -150,6 +192,8 @@ export function PantallaVentas() {
       precioNormal: monto,
       precioMayoreo: null,
       esMayoreo: false,
+      precioClienteFrecuente: null,
+      esClienteFrecuente: false,
       existenciaDisponible: null,
     };
     actualizarTicket(ticketActivo.id, (t) => ({ ...t, items: [...t.items, item] }));
@@ -158,20 +202,32 @@ export function PantallaVentas() {
 
   function cambiarCantidad(clave: string, cantidad: number) {
     if (!ticketActivo || cantidad <= 0) return;
+    const item = ticketActivo.items.find((i) => i.claveLocal === clave);
+    if (!item) return;
+    const cantidadFinal = limitarACantidadDisponible(item, cantidad);
     actualizarTicket(ticketActivo.id, (t) => ({
       ...t,
-      items: t.items.map((i) => (i.claveLocal === clave ? { ...i, cantidad } : i)),
+      items: t.items.map((i) => (i.claveLocal === clave ? { ...i, cantidad: cantidadFinal } : i)),
     }));
   }
 
-  function alternarMayoreo(clave: string) {
+  // El cajero elige explícitamente entre las 3 tarifas de la línea (Venta,
+  // Mayoreo, Cliente frecuente); solo una puede estar activa a la vez.
+  function seleccionarPrecio(clave: string, tipo: "VENTA" | "MAYOREO" | "CLIENTE_FRECUENTE") {
     if (!ticketActivo) return;
     actualizarTicket(ticketActivo.id, (t) => ({
       ...t,
       items: t.items.map((i) => {
-        if (i.claveLocal !== clave || i.precioMayoreo === null) return i;
-        const esMayoreo = !i.esMayoreo;
-        return { ...i, esMayoreo, precioUnitario: esMayoreo ? i.precioMayoreo! : i.precioNormal };
+        if (i.claveLocal !== clave) return i;
+        // "!= null" (no estricto) también cubre carritos guardados en el
+        // navegador antes de que este campo existiera (queda undefined).
+        if (tipo === "MAYOREO" && i.precioMayoreo != null) {
+          return { ...i, esMayoreo: true, esClienteFrecuente: false, precioUnitario: i.precioMayoreo };
+        }
+        if (tipo === "CLIENTE_FRECUENTE" && i.precioClienteFrecuente != null) {
+          return { ...i, esMayoreo: false, esClienteFrecuente: true, precioUnitario: i.precioClienteFrecuente };
+        }
+        return { ...i, esMayoreo: false, esClienteFrecuente: false, precioUnitario: i.precioNormal };
       }),
     }));
   }
@@ -183,7 +239,7 @@ export function PantallaVentas() {
 
   const total = ticketActivo?.items.reduce((a, i) => a + i.cantidad * i.precioUnitario, 0) ?? 0;
 
-  async function confirmarCobro(pagos: { forma: FormaPago; monto: number }[], clienteId: string | null) {
+  async function confirmarCobro(pagos: { forma: FormaPago; monto: number; referencia?: string }[], clienteId: string | null) {
     if (!ticketActivo || !turno) return;
     setProcesandoCobro(true);
     try {
@@ -200,6 +256,7 @@ export function PantallaVentas() {
             cantidad: i.cantidad,
             precioUnitario: i.precioUnitario,
             esMayoreo: i.esMayoreo,
+            esClienteFrecuente: i.esClienteFrecuente,
           })),
           pagos,
         }),
@@ -212,7 +269,14 @@ export function PantallaVentas() {
       toast.success(`Venta #${json.data.folio} registrada`);
       setModalCobro(false);
       setVersionCatalogo((v) => v + 1);
-      if (config) {
+      // Se pide la configuración justo antes de imprimir (en vez de reusar el
+      // estado cargado al abrir la pantalla) porque el Administrador General
+      // puede haber cambiado de sucursal activa desde entonces, y cada
+      // sucursal tiene su propio nombre/dirección/impresora.
+      const resConfig = await fetch("/api/pos/config");
+      const jsonConfig = await resConfig.json();
+      const configActual = jsonConfig.ok ? jsonConfig.data : config;
+      if (configActual) {
         imprimirTicketAutomatico(
           {
             folio: json.data.folio,
@@ -222,11 +286,11 @@ export function PantallaVentas() {
             items: ticketActivo.items.map((i) => ({ descripcion: i.nombre, cantidad: i.cantidad, precioUnitario: i.precioUnitario })),
             pagos,
             total,
-            config,
+            config: configActual,
           },
-          config.impresora
+          configActual.impresora
         ).then((via) => {
-          if (via === "navegador" && config.impresora) {
+          if (via === "navegador" && configActual.impresora) {
             toast("No se pudo conectar con QZ Tray, se abrió el diálogo de impresión.", { icon: "⚠️" });
           }
         });
@@ -252,20 +316,33 @@ export function PantallaVentas() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-dvh">
-      <div className="flex-1 lg:border-r border-borde min-h-[40vh]">
-        <BuscadorProductos
-          departamentos={departamentos}
-          version={versionCatalogo}
-          onSeleccionar={agregarProducto}
-          onCodigoNoEncontrado={() => {
-            toast("Código no encontrado. Usa 'Producto común' para venderlo directamente.", { icon: "ℹ️" });
-            setModalProductoComun(true);
-          }}
-        />
-      </div>
+    <div className="flex flex-col h-dvh bg-surface">
+      <BuscadorProductos
+        version={versionCatalogo}
+        onSeleccionar={agregarProducto}
+        onCodigoNoEncontrado={() => {
+          toast("Código no encontrado. Usa 'Producto común' para venderlo directamente.", { icon: "ℹ️" });
+          setModalProductoComun(true);
+        }}
+      />
 
-      <div className="w-full lg:w-[420px] flex flex-col bg-surface">
+      <div className="flex-1 flex flex-col min-h-0 relative">
+        {avisoStock && (
+          <div className="absolute inset-x-4 top-1/3 z-20 flex justify-center pointer-events-none">
+            <div
+              role="alert"
+              className="pointer-events-auto max-w-md rounded-2xl border-2 border-peligro bg-white shadow-lg px-6 py-5 text-center"
+            >
+              <p className="text-xl font-bold text-peligro leading-snug">{avisoStock}</p>
+              <button
+                onClick={() => setAvisoStock(null)}
+                className="mt-3 text-sm font-medium text-texto-suave hover:text-texto underline"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-1 border-b border-borde px-3 pt-3 overflow-x-auto">
           {tickets.map((t) => (
             <button
@@ -295,11 +372,27 @@ export function PantallaVentas() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-borde">
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-borde flex-wrap">
           <Badge variante="exito">Caja abierta · fondo {formatearMoneda(turno.fondoInicial)}</Badge>
           <button
+            onClick={() => setModalCliente(true)}
+            className={cn(
+              "flex items-center gap-1 text-xs font-medium",
+              ticketActivo?.clienteId ? "text-marca" : "text-texto-suave hover:text-marca"
+            )}
+          >
+            <UserRound className="h-3.5 w-3.5" />
+            {ticketActivo?.clienteId ? ticketActivo.clienteNombre : "Público en general"}
+          </button>
+          <button
+            onClick={() => setModalExistencias(true)}
+            className="ml-auto flex items-center gap-1 text-xs font-medium text-texto-suave hover:text-marca"
+          >
+            <Store className="h-3.5 w-3.5" /> Existencias en otras sucursales
+          </button>
+          <button
             onClick={() => setModalSalida(true)}
-            className="ml-auto flex items-center gap-1 text-xs font-medium text-texto-suave hover:text-peligro"
+            className="flex items-center gap-1 text-xs font-medium text-texto-suave hover:text-peligro"
           >
             <Wallet className="h-3.5 w-3.5" /> Salida de dinero
           </button>
@@ -341,15 +434,37 @@ export function PantallaVentas() {
                       +
                     </button>
                   </div>
-                  {item.precioMayoreo !== null && (
+                  {(item.precioMayoreo != null || item.precioClienteFrecuente != null) && (
                     <button
-                      onClick={() => alternarMayoreo(item.claveLocal)}
+                      onClick={() => seleccionarPrecio(item.claveLocal, "VENTA")}
+                      className={cn(
+                        "flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg border",
+                        !item.esMayoreo && !item.esClienteFrecuente ? "bg-marca text-white border-marca" : "border-borde text-texto-suave hover:bg-surface-hover"
+                      )}
+                    >
+                      <Tag className="h-3 w-3" /> Venta
+                    </button>
+                  )}
+                  {item.precioMayoreo != null && (
+                    <button
+                      onClick={() => seleccionarPrecio(item.claveLocal, "MAYOREO")}
                       className={cn(
                         "flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg border",
                         item.esMayoreo ? "bg-marca text-white border-marca" : "border-borde text-texto-suave hover:bg-surface-hover"
                       )}
                     >
                       <Tags className="h-3 w-3" /> Mayoreo
+                    </button>
+                  )}
+                  {item.precioClienteFrecuente != null && (
+                    <button
+                      onClick={() => seleccionarPrecio(item.claveLocal, "CLIENTE_FRECUENTE")}
+                      className={cn(
+                        "flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg border",
+                        item.esClienteFrecuente ? "bg-marca text-white border-marca" : "border-borde text-texto-suave hover:bg-surface-hover"
+                      )}
+                    >
+                      <Star className="h-3 w-3" /> Cliente frecuente
                     </button>
                   )}
                   <span className="text-sm font-semibold text-texto ml-auto">{formatearMoneda(item.cantidad * item.precioUnitario)}</span>
@@ -386,8 +501,16 @@ export function PantallaVentas() {
         <ModalSalidaCaja turnoId={turno.id} onCerrar={() => setModalSalida(false)} onRegistrada={() => setModalSalida(false)} />
       )}
       {modalCobro && (
-        <ModalCobro total={total} onCerrar={() => setModalCobro(false)} onConfirmar={confirmarCobro} procesando={procesandoCobro} />
+        <ModalCobro
+          total={total}
+          clienteInicial={ticketActivo?.clienteId ? { id: ticketActivo.clienteId, nombre: ticketActivo.clienteNombre ?? "" } : null}
+          onCerrar={() => setModalCobro(false)}
+          onConfirmar={confirmarCobro}
+          procesando={procesandoCobro}
+        />
       )}
+      {modalExistencias && <ModalExistenciasSucursales onCerrar={() => setModalExistencias(false)} />}
+      {modalCliente && <ModalSeleccionarCliente onCerrar={() => setModalCliente(false)} onSeleccionar={asignarCliente} />}
     </div>
   );
 }

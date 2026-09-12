@@ -10,6 +10,7 @@ import { formatearMoneda } from "@/lib/formato";
 import toast from "react-hot-toast";
 import { ModalCliente } from "./modal-cliente";
 import type { PosClienteT } from "@/lib/pos/tipos";
+import { ETIQUETAS_TIPO_PRECIO_CLIENTE } from "@/lib/pos/constantes";
 
 export function ClientesPanel() {
   const [clientes, setClientes] = useState<PosClienteT[]>([]);
@@ -68,7 +69,10 @@ export function ClientesPanel() {
           {clientes.map((c) => (
             <div key={c.id} className="flex items-center gap-3 rounded-xl border border-borde bg-surface p-4">
               <Link href={`/pos/clientes/${c.id}`} className="flex-1 min-w-0">
-                <div className="font-medium text-texto truncate">{c.nombre}</div>
+                <div className="flex items-center gap-2">
+                  <div className="font-medium text-texto truncate">{c.nombre}</div>
+                  {c.tipoPrecio !== "VENTA" && <Badge variante="marca">{ETIQUETAS_TIPO_PRECIO_CLIENTE[c.tipoPrecio]}</Badge>}
+                </div>
                 <div className="text-xs text-texto-suave">{c.telefono ?? "sin teléfono"} · {c.direccion ?? "sin dirección"}</div>
               </Link>
               <div className="text-right">

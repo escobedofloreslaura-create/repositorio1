@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requerirSesionPos } from "@/lib/pos/auth";
+import { requerirSesionPos, esAdminGeneral } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 import { registrarMovimientoInventario } from "@/lib/pos/kardex";
 import { TIPO_VENTA_POR_FORMA, type FormaPago } from "@/lib/pos/constantes";
@@ -20,6 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await prisma.$transaction(async (tx) => {
       const venta = await tx.posVenta.findUnique({ where: { id }, include: { turno: true, pagos: true } });
       if (!venta) throw new Error("NO_ENCONTRADA");
+      if (!esAdminGeneral(sesion) && venta.sucursalId !== sesion.sucursalId) throw new Error("NO_ENCONTRADA");
       if (venta.estado !== "COMPLETADA") throw new Error("NO_COMPLETADA");
       if (venta.turno.estado !== "ABIERTO") throw new Error("TURNO_CERRADO");
 
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (detalle.productoId) {
         await registrarMovimientoInventario(tx, {
           productoId: detalle.productoId,
+          sucursalId: venta.sucursalId,
           tipo: "DEVOLUCION",
           delta: cantidadNum,
           detalle: `Devolución parcial de venta #${venta.folio}`,

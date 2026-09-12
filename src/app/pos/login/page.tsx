@@ -48,7 +48,7 @@ export default function PosLoginPage() {
             <Wine className="h-7 w-7" />
           </div>
           <h1 className="text-2xl font-bold text-texto">Punto de Venta</h1>
-          <p className="text-texto-suave mt-1">Vinos y Licores</p>
+          <p className="text-texto-suave mt-1">Vinoexpress</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-surface border border-borde rounded-2xl p-6 shadow-sm space-y-4">
@@ -97,7 +97,7 @@ export default function PosLoginPage() {
           </Boton>
         </form>
 
-        <p className="text-center text-xs text-texto-muy-suave mt-6">Sistema de Punto de Venta · Vinos y Licores</p>
+        <p className="text-center text-xs text-texto-muy-suave mt-6">Sistema de Punto de Venta · Vinoexpress</p>
       </div>
     </div>
   );

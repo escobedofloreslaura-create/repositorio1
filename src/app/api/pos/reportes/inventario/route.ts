@@ -1,31 +1,41 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requerirSesionPos } from "@/lib/pos/auth";
+import { requerirSesionPos, requerirSucursalActiva } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 
-// Reporte general de inventario: piezas en existencia y comparación del
-// valor de inventario a precio de costo vs. precio de venta.
+// Reporte general de inventario de la sucursal activa: piezas en existencia
+// y comparación del valor de inventario a precio de costo vs. precio de venta.
 export async function GET() {
   try {
-    await requerirSesionPos();
-    const productos = await prisma.posProducto.findMany({
-      where: { activo: true },
-      include: { departamento: true },
-      orderBy: [{ departamento: { orden: "asc" } }, { nombre: "asc" }],
+    const sesion = await requerirSesionPos();
+    // El reporte de inventario expone el precio de costo y el valor del
+    // inventario: información confidencial del negocio, solo para
+    // administradores.
+    if (sesion.rol !== "ADMINISTRADOR") {
+      return NextResponse.json({ ok: false, error: "No tienes permiso para ver el inventario" }, { status: 403 });
+    }
+    const sucursalId = await requerirSucursalActiva(sesion);
+
+    const existencias = await prisma.posExistencia.findMany({
+      where: { sucursalId, producto: { activo: true } },
+      include: { producto: { include: { departamento: true } } },
+      orderBy: [{ producto: { departamento: { orden: "asc" } } }, { producto: { nombre: "asc" } }],
     });
 
-    const filas = productos.map((p) => ({
-      id: p.id,
-      nombre: p.nombre,
-      departamento: p.departamento.nombre,
-      unidad: p.unidad,
-      existencia: p.existencia,
-      existenciaMinima: p.existenciaMinima,
-      bajaExistencia: p.existencia <= p.existenciaMinima,
-      precioCosto: p.precioCosto,
-      precioVenta: p.precioVenta,
-      valorCosto: p.existencia * p.precioCosto,
-      valorVenta: p.existencia * p.precioVenta,
+    const filas = existencias.map((e) => ({
+      id: e.producto.id,
+      nombre: e.producto.nombre,
+      departamento: e.producto.departamento.nombre,
+      unidad: e.producto.unidad,
+      existencia: e.existencia,
+      existenciaMinima: e.existenciaMinima,
+      bajaExistencia: e.existencia <= e.existenciaMinima,
+      precioCosto: e.producto.precioCosto,
+      precioVenta: e.producto.precioVenta,
+      precioMayoreo: e.producto.precioMayoreo,
+      precioClienteFrecuente: e.producto.precioClienteFrecuente,
+      valorCosto: e.existencia * e.producto.precioCosto,
+      valorVenta: e.existencia * e.producto.precioVenta,
     }));
 
     const totales = filas.reduce(

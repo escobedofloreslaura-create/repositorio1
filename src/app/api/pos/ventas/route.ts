@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requerirSesionPos } from "@/lib/pos/auth";
+import { requerirSesionPos, requerirSucursalActiva, puedeOperarTurno } from "@/lib/pos/auth";
 import { respuestaError } from "@/lib/pos/api-utils";
 import { registrarMovimientoInventario } from "@/lib/pos/kardex";
 import { siguienteFolioVenta } from "@/lib/pos/folio";
@@ -12,18 +12,27 @@ interface ItemEntrada {
   cantidad: number;
   precioUnitario: number;
   esMayoreo?: boolean;
+  esClienteFrecuente?: boolean;
 }
 
 interface PagoEntrada {
   forma: "EFECTIVO" | "TARJETA" | "TRANSFERENCIA" | "CREDITO";
   monto: number;
+  referencia?: string | null;
 }
 
 const TOLERANCIA = 0.01;
 
 export async function GET(req: NextRequest) {
   try {
-    await requerirSesionPos();
+    const sesion = await requerirSesionPos();
+    // El histórico de ventas expone el detalle y costo de cada línea de
+    // venta de toda la sucursal (no solo del turno actual): es información
+    // confidencial del negocio, solo para administradores.
+    if (sesion.rol !== "ADMINISTRADOR") {
+      return NextResponse.json({ ok: false, error: "No tienes permiso para ver el histórico de ventas" }, { status: 403 });
+    }
+    const sucursalId = await requerirSucursalActiva(sesion);
     const { searchParams } = new URL(req.url);
     const desde = searchParams.get("desde");
     const hasta = searchParams.get("hasta");
@@ -32,6 +41,7 @@ export async function GET(req: NextRequest) {
 
     const ventas = await prisma.posVenta.findMany({
       where: {
+        sucursalId,
         ...(turnoId ? { turnoId } : {}),
         ...(estado ? { estado } : {}),
         ...(desde || hasta
@@ -94,21 +104,25 @@ export async function POST(req: NextRequest) {
     const venta = await prisma.$transaction(async (tx) => {
       const turno = await tx.posTurno.findUnique({ where: { id: turnoId } });
       if (!turno || turno.estado !== "ABIERTO") throw new Error("CAJA_CERRADA");
+      if (!puedeOperarTurno(sesion, turno)) throw new Error("SIN_PERMISO");
+      const sucursalId = turno.sucursalId;
 
       let cliente = null;
       if (montoCredito > 0 && clienteId) {
         cliente = await tx.posCliente.findUniqueOrThrow({ where: { id: clienteId } });
+        if (cliente.sucursalId !== sucursalId) throw new Error("SIN_PERMISO");
         const nuevoSaldo = cliente.saldoActual + montoCredito;
         if (nuevoSaldo > cliente.limiteCredito) throw new Error("LIMITE_CREDITO");
         await tx.posCliente.update({ where: { id: clienteId }, data: { saldoActual: nuevoSaldo } });
       }
 
-      const folio = await siguienteFolioVenta(tx);
+      const folio = await siguienteFolioVenta(tx, sucursalId);
 
       const nuevaVenta = await tx.posVenta.create({
         data: {
           folio,
           turnoId,
+          sucursalId,
           clienteId: clienteId || null,
           usuarioId: sesion.id,
           subtotal: totalTicket,
@@ -121,12 +135,14 @@ export async function POST(req: NextRequest) {
         let costoUnitario = 0;
         if (item.productoId) {
           const producto = await tx.posProducto.findUniqueOrThrow({ where: { id: item.productoId } });
-          if (producto.existencia < item.cantidad) {
+          const existencia = await tx.posExistencia.findUnique({ where: { sucursalId_productoId: { sucursalId, productoId: item.productoId } } });
+          if ((existencia?.existencia ?? 0) < item.cantidad) {
             throw new Error(`STOCK_INSUFICIENTE:${producto.nombre}`);
           }
           costoUnitario = producto.precioCosto;
           await registrarMovimientoInventario(tx, {
             productoId: item.productoId,
+            sucursalId,
             tipo: "VENTA",
             delta: -item.cantidad,
             detalle: `Venta #${folio}`,
@@ -144,6 +160,7 @@ export async function POST(req: NextRequest) {
             precioUnitario: item.precioUnitario,
             costoUnitario,
             esMayoreo: !!item.esMayoreo,
+            esClienteFrecuente: !!item.esClienteFrecuente,
             subtotal: item.cantidad * item.precioUnitario,
           },
         });
@@ -151,7 +168,7 @@ export async function POST(req: NextRequest) {
 
       for (const pago of pagos) {
         await tx.posPagoVenta.create({
-          data: { ventaId: nuevaVenta.id, forma: pago.forma, monto: pago.monto },
+          data: { ventaId: nuevaVenta.id, forma: pago.forma, monto: pago.monto, referencia: pago.referencia?.trim() || null },
         });
 
         const tipoMovimiento = TIPO_VENTA_POR_FORMA[pago.forma];
@@ -181,6 +198,9 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     if (e instanceof Error && e.message === "CAJA_CERRADA") {
       return NextResponse.json({ ok: false, error: "La caja de este turno ya está cerrada" }, { status: 409 });
+    }
+    if (e instanceof Error && e.message === "SIN_PERMISO") {
+      return NextResponse.json({ ok: false, error: "No puedes vender en la caja de otro cajero" }, { status: 403 });
     }
     if (e instanceof Error && e.message === "LIMITE_CREDITO") {
       return NextResponse.json({ ok: false, error: "El cliente excede su límite de crédito" }, { status: 409 });

@@ -13,7 +13,21 @@ import { ModalMovimiento } from "./modal-movimiento";
 import { ModalImportar } from "./modal-importar";
 import type { PosProductoT, PosDepartamentoT } from "@/lib/pos/tipos";
 
-export function ProductosPanel({ esAdmin }: { esAdmin: boolean }) {
+export function ProductosPanel({
+  puedeEditarCatalogo,
+  puedeAjustarInventario,
+  puedeRegistrarEntrada,
+  esAdmin,
+}: {
+  /** Nombre, precios, alta/baja del producto: solo el Administrador General (catálogo único de la cadena). */
+  puedeEditarCatalogo: boolean;
+  /** Entradas/salidas/ajustes de existencia en la sucursal activa: cualquier administrador. */
+  puedeAjustarInventario: boolean;
+  /** Un cajero puede recibir mercancía de un proveedor (solo entradas), sin editar el catálogo. */
+  puedeRegistrarEntrada: boolean;
+  /** El precio de costo es confidencial: solo lo ve un administrador. */
+  esAdmin: boolean;
+}) {
   const [productos, setProductos] = useState<PosProductoT[]>([]);
   const [departamentos, setDepartamentos] = useState<PosDepartamentoT[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -55,9 +69,9 @@ export function ProductosPanel({ esAdmin }: { esAdmin: boolean }) {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
         <h1 className="text-xl font-bold text-texto">Catálogo de productos</h1>
-        {esAdmin && (
+        {puedeEditarCatalogo && (
           <div className="flex gap-2">
             <Boton variante="secundario" icono={<Upload className="h-4 w-4" />} onClick={() => setModalImportar(true)}>
               Importar
@@ -68,6 +82,9 @@ export function ProductosPanel({ esAdmin }: { esAdmin: boolean }) {
           </div>
         )}
       </div>
+      <p className="text-xs text-texto-muy-suave mb-5">
+        Nombre, precios y alta de productos son compartidos por toda la cadena. La existencia mostrada es la de tu sucursal activa.
+      </p>
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="relative flex-1 min-w-[220px]">
@@ -101,11 +118,14 @@ export function ProductosPanel({ esAdmin }: { esAdmin: boolean }) {
               <tr className="border-b border-borde text-left text-texto-suave">
                 <th className="p-3 font-medium">Producto</th>
                 <th className="p-3 font-medium">Departamento</th>
-                <th className="p-3 font-medium text-right">Costo</th>
+                {esAdmin && <th className="p-3 font-medium text-right">Costo</th>}
                 <th className="p-3 font-medium text-right">Venta</th>
                 <th className="p-3 font-medium text-right">Mayoreo</th>
+                <th className="p-3 font-medium text-right">Cliente frecuente</th>
                 <th className="p-3 font-medium text-right">Existencia</th>
-                {esAdmin && <th className="p-3 font-medium text-right">Acciones</th>}
+                {(puedeEditarCatalogo || puedeAjustarInventario || puedeRegistrarEntrada) && (
+                  <th className="p-3 font-medium text-right">Acciones</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -116,24 +136,35 @@ export function ProductosPanel({ esAdmin }: { esAdmin: boolean }) {
                     <div className="text-xs text-texto-muy-suave">{p.codigoBarras ?? "sin código"} · {p.unidad === "CAJA" ? "Caja" : "Pieza"}</div>
                   </td>
                   <td className="p-3 text-texto-suave">{p.departamento?.nombre}</td>
-                  <td className="p-3 text-right">{formatearMoneda(p.precioCosto)}</td>
+                  {esAdmin && <td className="p-3 text-right">{formatearMoneda(p.precioCosto ?? 0)}</td>}
                   <td className="p-3 text-right font-medium">{formatearMoneda(p.precioVenta)}</td>
                   <td className="p-3 text-right text-texto-suave">{p.precioMayoreo ? formatearMoneda(p.precioMayoreo) : "—"}</td>
+                  <td className="p-3 text-right text-texto-suave">{p.precioClienteFrecuente ? formatearMoneda(p.precioClienteFrecuente) : "—"}</td>
                   <td className="p-3 text-right">
                     <Badge variante={p.existencia <= p.existenciaMinima ? "peligro" : "exito"}>{p.existencia}</Badge>
                   </td>
-                  {esAdmin && (
+                  {(puedeEditarCatalogo || puedeAjustarInventario || puedeRegistrarEntrada) && (
                     <td className="p-3">
                       <div className="flex justify-end gap-1">
-                        <button onClick={() => setModalMovimiento(p)} className="p-1.5 rounded-lg hover:bg-surface-hover text-texto-suave" title="Movimiento de inventario">
-                          <ArrowLeftRight className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => setModalEdicion({ producto: p })} className="p-1.5 rounded-lg hover:bg-surface-hover text-texto-suave" title="Editar">
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => eliminar(p)} className="p-1.5 rounded-lg hover:bg-red-50 text-texto-suave hover:text-peligro" title="Dar de baja">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {(puedeAjustarInventario || puedeRegistrarEntrada) && (
+                          <button
+                            onClick={() => setModalMovimiento(p)}
+                            className="p-1.5 rounded-lg hover:bg-surface-hover text-texto-suave"
+                            title={puedeAjustarInventario ? "Movimiento de inventario" : "Registrar entrada de mercancía"}
+                          >
+                            <ArrowLeftRight className="h-4 w-4" />
+                          </button>
+                        )}
+                        {puedeEditarCatalogo && (
+                          <>
+                            <button onClick={() => setModalEdicion({ producto: p })} className="p-1.5 rounded-lg hover:bg-surface-hover text-texto-suave" title="Editar">
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => eliminar(p)} className="p-1.5 rounded-lg hover:bg-red-50 text-texto-suave hover:text-peligro" title="Dar de baja">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   )}
@@ -150,10 +181,20 @@ export function ProductosPanel({ esAdmin }: { esAdmin: boolean }) {
           departamentos={departamentos}
           onCerrar={() => setModalEdicion(null)}
           onGuardado={() => { setModalEdicion(null); cargar(); }}
+          onModificarInventario={
+            puedeAjustarInventario && modalEdicion.producto
+              ? () => { setModalMovimiento(modalEdicion.producto); setModalEdicion(null); }
+              : undefined
+          }
         />
       )}
       {modalMovimiento && (
-        <ModalMovimiento producto={modalMovimiento} onCerrar={() => setModalMovimiento(null)} onRegistrado={() => { setModalMovimiento(null); cargar(); }} />
+        <ModalMovimiento
+          producto={modalMovimiento}
+          soloEntrada={!puedeAjustarInventario}
+          onCerrar={() => setModalMovimiento(null)}
+          onRegistrado={() => { setModalMovimiento(null); cargar(); }}
+        />
       )}
       {modalImportar && (
         <ModalImportar onCerrar={() => setModalImportar(false)} onImportado={cargar} />
